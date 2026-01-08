@@ -3,6 +3,23 @@ import { RegisterTab, TodayTab, CalendarTab, DatabaseTab, ReviewTab } from './co
 import { calculateElapsedTime, getDateString } from './utils/formatters.js';
 import { styles } from './styles/styles.js';
 
+// 定数定義
+const SAVE_DEBOUNCE_MS = 500;
+const TIMER_INTERVAL_MS = 1000;
+const FOCUS_DELAY_MS = 50;
+const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
+const CLAUDE_API_VERSION = '2023-06-01';
+const CLAUDE_MAX_TOKENS = 1000;
+
+// 今日の日付を取得（ローカルタイムゾーン対応）
+const getTodayDate = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function TaskManagerApp({ apiKey }) {
   const [tab, setTab] = useState('register');
   const [tasks, setTasks] = useState([]);
@@ -34,7 +51,7 @@ function TaskManagerApp({ apiKey }) {
   const [tick, setTick] = useState(0);
   const tickRef = useRef(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayDate();
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
@@ -42,6 +59,15 @@ function TaskManagerApp({ apiKey }) {
   const hasActiveTask = useMemo(() => {
     return tasks.some(t => t.status === '作業中');
   }, [tasks]);
+
+  // APIキーのバリデーション
+  useEffect(() => {
+    if (!apiKey) {
+      console.warn('⚠️ Anthropic APIキーが設定されていません。AI機能（タスク抽出・振り返り）は無効です。');
+    } else {
+      console.info('✅ Anthropic APIキーが設定されています。');
+    }
+  }, [apiKey]);
 
   useEffect(() => {
     async function loadData() {
@@ -98,7 +124,7 @@ function TaskManagerApp({ apiKey }) {
       window.storage.set('tasks', JSON.stringify(tasks)).catch(e => {
         console.error('タスク保存エラー:', e);
       });
-    }, 500);
+    }, SAVE_DEBOUNCE_MS);
 
     return () => {
       if (saveTimeoutRef.current) {
@@ -127,7 +153,7 @@ function TaskManagerApp({ apiKey }) {
     if (hasActiveTask) {
       tickRef.current = setInterval(() => {
         setTick(t => t + 1);
-      }, 1000);
+      }, TIMER_INTERVAL_MS);
     } else {
       if (tickRef.current) {
         clearInterval(tickRef.current);
@@ -173,7 +199,7 @@ function TaskManagerApp({ apiKey }) {
           inputRef.select();
         }
         setNewTaskId(null);
-      }, 50);
+      }, FOCUS_DELAY_MS);
       return () => clearTimeout(timeoutId);
     }
   }, [newTaskId]);
@@ -201,11 +227,11 @@ function TaskManagerApp({ apiKey }) {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'anthropic-version': CLAUDE_API_VERSION
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
+          model: CLAUDE_MODEL,
+          max_tokens: CLAUDE_MAX_TOKENS,
           messages: [{
             role: 'user',
             content: `タスク抽出。タグ:${tags.join(',')}。テキスト:${input}。JSON形式のみ:[{"name":"","tag":"","memo":""}]`
@@ -214,7 +240,9 @@ function TaskManagerApp({ apiKey }) {
       });
 
       if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
+        const errorText = await res.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`API error: ${res.status} - ${errorText}`);
       }
 
       const data = await res.json();
@@ -226,7 +254,18 @@ function TaskManagerApp({ apiKey }) {
       })));
     } catch (e) {
       console.error('タスク抽出エラー:', e);
-      setExtractError('AI抽出に失敗しました。行ごとにタスクを作成します。');
+      let errorMsg = 'AI抽出に失敗しました。';
+      if (e.message.includes('401')) {
+        errorMsg = 'APIキーが無効です。設定を確認してください。';
+      } else if (e.message.includes('429')) {
+        errorMsg = 'API利用上限に達しました。しばらく待ってから再試行してください。';
+      } else if (e.message.includes('400')) {
+        errorMsg = 'リクエストが無効です。モデル名やAPIキーを確認してください。';
+      } else if (e.message) {
+        errorMsg = `AI抽出エラー: ${e.message.substring(0, 100)}`;
+      }
+      errorMsg += ' 行ごとにタスクを作成します。';
+      setExtractError(errorMsg);
       const lines = input.split('\n').filter(l => l.trim());
       setExtracted(lines.map((l, i) => ({
         name: l.trim(),
@@ -584,11 +623,11 @@ function TaskManagerApp({ apiKey }) {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'anthropic-version': CLAUDE_API_VERSION
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
+          model: CLAUDE_MODEL,
+          max_tokens: CLAUDE_MAX_TOKENS,
           messages: [{
             role: 'user',
             content: `タスク振り返り。期間:${period === 'week' ? '1週間' : '1ヶ月'}。総数:${totalCount}件、完了:${completedCount}件。形式:\n【よかった点】\n・\n【改善点】\n・\n【次への提案】\n・`
@@ -597,14 +636,26 @@ function TaskManagerApp({ apiKey }) {
       });
 
       if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
+        const errorText = await res.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`API error: ${res.status} - ${errorText}`);
       }
 
       const data = await res.json();
       setAiReview(data.content[0].text);
     } catch (e) {
       console.error('レビュー生成エラー:', e);
-      setReviewError('AI分析の生成に失敗しました');
+      let errorMsg = 'AI分析の生成に失敗しました。';
+      if (e.message.includes('401')) {
+        errorMsg = 'APIキーが無効です。設定を確認してください。';
+      } else if (e.message.includes('429')) {
+        errorMsg = 'API利用上限に達しました。しばらく待ってから再試行してください。';
+      } else if (e.message.includes('400')) {
+        errorMsg = 'リクエストが無効です。モデル名やAPIキーを確認してください。';
+      } else if (e.message) {
+        errorMsg = `AI分析エラー: ${e.message.substring(0, 100)}`;
+      }
+      setReviewError(errorMsg);
       setAiReview('');
     }
     setReviewing(false);
