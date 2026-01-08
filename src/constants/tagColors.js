@@ -1,0 +1,39 @@
+// タグごとの色定義
+export const tagColors = {
+  '売上アップ': { bg: 'rgba(0, 212, 255, 0.3)', border: '#00d4ff' },
+  '雑務': { bg: 'rgba(156, 163, 175, 0.3)', border: '#9ca3af' },
+  '仕入れ': { bg: 'rgba(34, 197, 94, 0.3)', border: '#22c55e' },
+  '広告': { bg: 'rgba(249, 115, 22, 0.3)', border: '#f97316' },
+  '受注発送関連': { bg: 'rgba(168, 85, 247, 0.3)', border: '#a855f7' },
+  'default': { bg: 'rgba(107, 114, 128, 0.3)', border: '#6b7280' }
+};
+
+export const getTagColor = (tag) => {
+  return tagColors[tag] || tagColors['default'];
+};
+
+// ステータスごとの色定義
+export const statusColors = {
+  '未着手': '#6b7280',
+  '作業中': '#ef4444',
+  '中断中': '#eab308',
+  '待ち': '#f97316',
+  '完了': '#22c55e'
+};
+
+export const getStatusColor = (status) => {
+  return statusColors[status] || '#6b7280';
+};
+
+// ステータスアイコン
+export const statusIcons = {
+  '未着手': '☐',
+  '作業中': '🔴',
+  '中断中': '🟡',
+  '待ち': '🟠',
+  '完了': '✅'
+};
+
+export const getStatusIcon = (status) => {
+  return statusIcons[status] || '☐';
+};
