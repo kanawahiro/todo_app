@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { RegisterTab, TodayTab, CalendarTab, DatabaseTab, ReviewTab } from './components/AppTabs.jsx';
 import { calculateElapsedTime, getDateString } from './utils/formatters.js';
 import { styles } from './styles/styles.js';
@@ -7,9 +8,9 @@ import { styles } from './styles/styles.js';
 const SAVE_DEBOUNCE_MS = 500;
 const TIMER_INTERVAL_MS = 1000;
 const FOCUS_DELAY_MS = 50;
-const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
-const CLAUDE_API_VERSION = '2023-06-01';
-const CLAUDE_MAX_TOKENS = 1000;
+const GEMINI_MODEL = 'gemini-1.5-flash-8b';
+
+// ... (省略される可能性があるため、部分置換ではなく範囲を指定)
 
 // 今日の日付を取得（ローカルタイムゾーン対応）
 const getTodayDate = () => {
@@ -63,9 +64,9 @@ function TaskManagerApp({ apiKey }) {
   // APIキーのバリデーション
   useEffect(() => {
     if (!apiKey) {
-      console.warn('⚠️ Anthropic APIキーが設定されていません。AI機能（タスク抽出・振り返り）は無効です。');
+      console.warn('⚠️ Gemini APIキーが設定されていません。AI機能（タスク抽出・振り返り）は無効です。');
     } else {
-      console.info('✅ Anthropic APIキーが設定されています。');
+      console.info('✅ Gemini APIキーが設定されています。');
     }
   }, [apiKey]);
 
@@ -222,51 +223,63 @@ function TaskManagerApp({ apiKey }) {
     }
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': CLAUDE_API_VERSION
-        },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          max_tokens: CLAUDE_MAX_TOKENS,
-          messages: [{
-            role: 'user',
-            content: `タスク抽出。タグ:${tags.join(',')}。テキスト:${input}。JSON形式のみ:[{"name":"","tag":"","memo":""}]`
-          }]
-        })
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({
+        model: GEMINI_MODEL,
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`API error: ${res.status} - ${errorText}`);
-      }
+      const prompt = `あなたは優秀なタスク管理アシスタントです。
+以下のテキストから個別のタスクを抽出し、JSON形式のリストのみを返してください。
 
-      const data = await res.json();
-      const text = data.content[0].text.replace(/```json|```/g, '').trim();
+抽出ルール:
+1. 「〜すること」「〜する」といった個別の行動を独立したタスクとして抽出してください。
+2. 各タスクを以下のいずれかのタグに分類してください: ${tags.join(', ')}
+3. 抽出したタスクを以下のJSON構造で出力してください。説明や挨拶は一切含めないでください。
+
+[
+  {"name": "具体的なタスク名", "tag": "割り当てたタグ名", "memo": ""}
+]
+
+テキスト:
+${input}`;
+
+      const result = await model.generateContent(prompt);
+      let text = await result.response.text();
+
+      // JSONのみを抽出するためのクリーニング
+      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) text = match[0];
+
       const parsed = JSON.parse(text);
       setExtracted(parsed.map((t, i) => ({
         ...t,
         tid: Date.now() + i
       })));
     } catch (e) {
-      console.error('タスク抽出エラー:', e);
+      console.error('タスク抽出エラー詳細:', e);
       let errorMsg = 'AI抽出に失敗しました。';
-      if (e.message.includes('401')) {
+
+      const errorStr = (e.message || '') + (e.stack || '');
+      if (errorStr.includes('API_KEY_INVALID') || errorStr.includes('401')) {
         errorMsg = 'APIキーが無効です。設定を確認してください。';
-      } else if (e.message.includes('429')) {
-        errorMsg = 'API利用上限に達しました。しばらく待ってから再試行してください。';
-      } else if (e.message.includes('400')) {
-        errorMsg = 'リクエストが無効です。モデル名やAPIキーを確認してください。';
+      } else if (errorStr.includes('RATE_LIMIT') || errorStr.includes('429')) {
+        errorMsg = 'API利用上限（または予算制限）に達しました。しばらく待ってから再試行してください。';
+      } else if (errorStr.includes('400')) {
+        errorMsg = 'リクエストが無効です。モデル名や設定を確認してください。';
       } else if (e.message) {
         errorMsg = `AI抽出エラー: ${e.message.substring(0, 100)}`;
       }
-      errorMsg += ' 行ごとにタスクを作成します。';
+
+      errorMsg += ' (改行で区切ってタスクを作成します)';
       setExtractError(errorMsg);
-      const lines = input.split('\n').filter(l => l.trim());
+
+      // テキスト形式の \n を実際の改行に変換してから分割
+      const normalizedInput = input.replace(/\\n/g, '\n');
+      const lines = normalizedInput.split('\n').filter(l => l.trim());
       setExtracted(lines.map((l, i) => ({
         name: l.trim(),
         tag: tags[0] || '',
@@ -618,37 +631,21 @@ function TaskManagerApp({ apiKey }) {
     }
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': CLAUDE_API_VERSION
-        },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          max_tokens: CLAUDE_MAX_TOKENS,
-          messages: [{
-            role: 'user',
-            content: `タスク振り返り。期間:${period === 'week' ? '1週間' : '1ヶ月'}。総数:${totalCount}件、完了:${completedCount}件。形式:\n【よかった点】\n・\n【改善点】\n・\n【次への提案】\n・`
-          }]
-        })
-      });
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`API error: ${res.status} - ${errorText}`);
-      }
-
-      const data = await res.json();
-      setAiReview(data.content[0].text);
+      const prompt = `タスク振り返り。期間:${period === 'week' ? '1週間' : '1ヶ月'}。総数:${totalCount}件、完了:${completedCount}件。形式:\n【よかった点】\n・\n【改善点】\n・\n【次への提案】\n・`;
+      const result = await model.generateContent(prompt);
+      let text = result.response.text();
+      // Markdownのコードブロックが含まれている場合の除去
+      text = text.replace(/```markdown/g, '').replace(/```/g, '').trim();
+      setAiReview(text);
     } catch (e) {
       console.error('レビュー生成エラー:', e);
       let errorMsg = 'AI分析の生成に失敗しました。';
-      if (e.message.includes('401')) {
+      if (e.message.includes('API_KEY_INVALID') || e.message.includes('401')) {
         errorMsg = 'APIキーが無効です。設定を確認してください。';
-      } else if (e.message.includes('429')) {
+      } else if (e.message.includes('RATE_LIMIT') || e.message.includes('429')) {
         errorMsg = 'API利用上限に達しました。しばらく待ってから再試行してください。';
       } else if (e.message.includes('400')) {
         errorMsg = 'リクエストが無効です。モデル名やAPIキーを確認してください。';
