@@ -8,7 +8,7 @@ React + Viteで構築されたタスク管理アプリケーションです。
 - 🏷️ タグによるタスク分類
 - ⏱️ 作業時間の自動計測
 - 📅 カレンダービューでの作業履歴確認
-- 🤖 Claude AIによるタスク抽出と振り返り機能
+- 🤖 Anthropic Claude AIによるタスク抽出と振り返り機能
 - 📊 データベースビューでのタスク検索・フィルタリング
 
 ## セットアップ
@@ -23,12 +23,14 @@ npm install
 
 AI機能を使用する場合は、Anthropic Claude APIキーが必要です。
 
+APIキーは [Anthropic Console](https://console.anthropic.com/) から取得できます。
+
 ```bash
 # .env.example を .env にコピー
 cp .env.example .env
 
 # .env ファイルを編集してAPIキーを設定
-VITE_ANTHROPIC_API_KEY=your_api_key_here
+VITE_ANTHROPIC_API_KEY=sk-ant-api03-your_api_key_here
 ```
 
 ### 3. 開発サーバーの起動
