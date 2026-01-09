@@ -8,7 +8,7 @@ import { styles } from './styles/styles.js';
 const SAVE_DEBOUNCE_MS = 500;
 const TIMER_INTERVAL_MS = 1000;
 const FOCUS_DELAY_MS = 50;
-const CLAUDE_MODEL = 'claude-3-5-haiku-20241022';
+const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 const CLAUDE_MAX_TOKENS = 2000;
 
 // ... (省略される可能性があるため、部分置換ではなく範囲を指定)
