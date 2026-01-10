@@ -11,6 +11,9 @@ const FOCUS_DELAY_MS = 50;
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 const CLAUDE_MAX_TOKENS = 2000;
 
+// Vercel API エンドポイント（本番環境用）
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 // ... (省略される可能性があるため、部分置換ではなく範囲を指定)
 
 // 今日の日付を取得（ローカルタイムゾーン対応）
@@ -218,51 +221,89 @@ function TaskManagerApp({ apiKey }) {
     console.log('APIキー存在:', !!apiKey);
     console.log('APIキー先頭:', apiKey ? apiKey.substring(0, 20) + '...' : 'なし');
 
-    // 修正案2: APIキーがない場合の処理を統一
+    // APIキーがない場合はVercel API経由で呼び出し
     if (!apiKey) {
-      console.warn('⚠️ APIキーが設定されていないため、フォールバック処理を使用');
-      setExtractError('APIキーが設定されていません。改行で区切ってタスクを作成します。');
-      setAiStatus('ng');
+      console.log('APIキーなし - Vercel API経由で呼び出し');
 
-      // 改善されたフォールバック処理
-      const normalizedInput = input.replace(/\\n/g, '\n');
-      const lines = normalizedInput.split('\n').filter(l => l.trim());
+      // Vercel APIのURLを決定
+      const apiUrl = API_BASE_URL ? `${API_BASE_URL}/api/extract-tasks` : '/api/extract-tasks';
+      console.log('API URL:', apiUrl);
 
-      const fallbackExtracted = lines.map((line, i) => {
-        let cleaned = line
-          .replace(/^[\-\•\*]\s+/, '')
-          .replace(/^\d+[\.\)]\s+/, '')
-          .trim();
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input, tags })
+        });
 
-        let name = cleaned;
-        let memo = '';
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `API error: ${response.status}`);
+        }
 
-        const separators = ['。', ':', '：'];
-        for (const sep of separators) {
-          const idx = cleaned.indexOf(sep);
-          if (idx > 0 && idx < 30) {
-            name = cleaned.substring(0, idx).trim();
-            memo = cleaned.substring(idx + 1).trim();
-            break;
+        const data = await response.json();
+        console.log('Vercel API応答:', data);
+
+        if (data.success && data.tasks) {
+          console.log('✓ タスク抽出成功:', data.tasks.length, '件のタスクを抽出');
+          data.tasks.forEach((t, i) => {
+            console.log(`  ${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'}`);
+          });
+          setAiStatus('ok');
+          setExtracted(data.tasks.map((t, i) => ({
+            ...t,
+            tid: Date.now() + i
+          })));
+          setExtracting(false);
+          return;
+        } else {
+          throw new Error('Invalid response from API');
+        }
+      } catch (e) {
+        console.error('Vercel API エラー:', e);
+        setExtractError(`AI抽出に失敗しました: ${e.message} (改行で区切ってタスクを作成します)`);
+        setAiStatus('ng');
+
+        // フォールバック処理
+        const normalizedInput = input.replace(/\\n/g, '\n');
+        const lines = normalizedInput.split('\n').filter(l => l.trim());
+
+        const fallbackExtracted = lines.map((line, i) => {
+          let cleaned = line
+            .replace(/^[\-\•\*]\s+/, '')
+            .replace(/^\d+[\.\)]\s+/, '')
+            .trim();
+
+          let name = cleaned;
+          let memo = '';
+
+          const separators = ['。', ':', '：'];
+          for (const sep of separators) {
+            const idx = cleaned.indexOf(sep);
+            if (idx > 0 && idx < 30) {
+              name = cleaned.substring(0, idx).trim();
+              memo = cleaned.substring(idx + 1).trim();
+              break;
+            }
           }
-        }
 
-        if (name.length > 30 && !memo) {
-          memo = name;
-          name = name.substring(0, 27) + '...';
-        }
+          if (name.length > 30 && !memo) {
+            memo = name;
+            name = name.substring(0, 27) + '...';
+          }
 
-        return {
-          name,
-          tag: tags[0] || '',
-          memo,
-          tid: Date.now() + i
-        };
-      });
+          return {
+            name,
+            tag: tags[0] || '',
+            memo,
+            tid: Date.now() + i
+          };
+        });
 
-      setExtracted(fallbackExtracted);
-      setExtracting(false);
-      return;
+        setExtracted(fallbackExtracted);
+        setExtracting(false);
+        return;
+      }
     }
 
     try {
@@ -739,8 +780,35 @@ ${input}`;
     const completedCount = reviewTasks.filter(t => t.status === '完了').length;
     const totalCount = reviewTasks.length;
 
+    // APIキーがない場合はVercel API経由で呼び出し
     if (!apiKey) {
-      setAiReview('APIキーが設定されていないため、AI分析を実行できません。');
+      console.log('APIキーなし - Vercel API経由で振り返り生成');
+
+      const apiUrl = API_BASE_URL ? `${API_BASE_URL}/api/generate-review` : '/api/generate-review';
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ period, totalCount, completedCount })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.success && data.review) {
+          setAiReview(data.review);
+        } else {
+          throw new Error('Invalid response from API');
+        }
+      } catch (e) {
+        console.error('Vercel API エラー:', e);
+        setReviewError(`AI分析に失敗しました: ${e.message}`);
+        setAiReview('');
+      }
       setReviewing(false);
       return;
     }
