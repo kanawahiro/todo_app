@@ -211,20 +211,67 @@ function TaskManagerApp({ apiKey }) {
     if (!input.trim()) return;
     setExtracting(true);
     setExtractError(null);
+    setAiStatus(null); // リセット
 
+    // 修正案1: APIキーのデバッグ出力
+    console.log('=== タスク抽出開始 ===');
+    console.log('APIキー存在:', !!apiKey);
+    console.log('APIキー先頭:', apiKey ? apiKey.substring(0, 20) + '...' : 'なし');
+
+    // 修正案2: APIキーがない場合の処理を統一
     if (!apiKey) {
-      const lines = input.split('\n').filter(l => l.trim());
-      setExtracted(lines.map((l, i) => ({
-        name: l.trim(),
-        tag: tags[0] || '',
-        memo: '',
-        tid: Date.now() + i
-      })));
+      console.warn('⚠️ APIキーが設定されていないため、フォールバック処理を使用');
+      setExtractError('APIキーが設定されていません。改行で区切ってタスクを作成します。');
+      setAiStatus('ng');
+
+      // 改善されたフォールバック処理
+      const normalizedInput = input.replace(/\\n/g, '\n');
+      const lines = normalizedInput.split('\n').filter(l => l.trim());
+
+      const fallbackExtracted = lines.map((line, i) => {
+        let cleaned = line
+          .replace(/^[\-\•\*]\s+/, '')
+          .replace(/^\d+[\.\)]\s+/, '')
+          .trim();
+
+        let name = cleaned;
+        let memo = '';
+
+        const separators = ['。', ':', '：'];
+        for (const sep of separators) {
+          const idx = cleaned.indexOf(sep);
+          if (idx > 0 && idx < 30) {
+            name = cleaned.substring(0, idx).trim();
+            memo = cleaned.substring(idx + 1).trim();
+            break;
+          }
+        }
+
+        if (name.length > 30 && !memo) {
+          memo = name;
+          name = name.substring(0, 27) + '...';
+        }
+
+        return {
+          name,
+          tag: tags[0] || '',
+          memo,
+          tid: Date.now() + i
+        };
+      });
+
+      setExtracted(fallbackExtracted);
       setExtracting(false);
       return;
     }
 
     try {
+      // 修正案3: API呼び出しの詳細なログ
+      console.log('=== API呼び出し開始 ===');
+      console.log('モデル:', CLAUDE_MODEL);
+      console.log('max_tokens:', CLAUDE_MAX_TOKENS);
+      console.log('入力テキスト長:', input.length, '文字');
+
       const client = new Anthropic({
         apiKey: apiKey,
         dangerouslyAllowBrowser: true
@@ -265,6 +312,7 @@ function TaskManagerApp({ apiKey }) {
 入力テキスト:
 ${input}`;
 
+      console.log('API呼び出し中...');
       const response = await client.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: CLAUDE_MAX_TOKENS,
@@ -272,6 +320,9 @@ ${input}`;
           { role: 'user', content: prompt }
         ]
       });
+      console.log('=== API応答受信 ===');
+      console.log('ステータス:', response.stop_reason);
+      console.log('使用トークン:', response.usage);
 
       let text = response.content[0].text;
 
