@@ -28,10 +28,13 @@ export const formatTimeHHMM = (timestamp) => {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 };
 
-// 日付文字列を取得 (YYYY-MM-DD)
+// 日付文字列を取得 (YYYY-MM-DD) - ローカルタイムゾーン基準
 export const getDateString = (timestamp) => {
   const date = new Date(timestamp);
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 // 曜日を取得

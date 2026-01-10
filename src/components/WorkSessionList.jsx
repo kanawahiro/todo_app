@@ -14,15 +14,13 @@ export const WorkSessionList = memo(function WorkSessionList({
   const sessions = task.workSessions || [];
   const dateString = task.registeredDate;
 
-  const todaySessions = sessions.filter(s => {
-    const sessionDate = getDateString(s.start);
-    return sessionDate === dateString;
-  }).sort((a, b) => a.start - b.start);
+  // 全セッションを表示（時系列順）
+  const allSessions = [...sessions].sort((a, b) => a.start - b.start);
 
   const handleUpdateSession = useCallback((index, updatedSession) => {
     const originalIndex = sessions.findIndex(s =>
-      s.start === todaySessions[index].start &&
-      s.end === todaySessions[index].end
+      s.start === allSessions[index].start &&
+      s.end === allSessions[index].end
     );
     if (originalIndex === -1) return;
 
@@ -31,19 +29,19 @@ export const WorkSessionList = memo(function WorkSessionList({
 
     const newAccumulatedTime = recalculateAccumulatedTime(newSessions);
     onUpdateSessions(task.id, newSessions, newAccumulatedTime);
-  }, [sessions, todaySessions, task.id, onUpdateSessions]);
+  }, [sessions, allSessions, task.id, onUpdateSessions]);
 
   const handleDeleteSession = useCallback((index) => {
     const originalIndex = sessions.findIndex(s =>
-      s.start === todaySessions[index].start &&
-      s.end === todaySessions[index].end
+      s.start === allSessions[index].start &&
+      s.end === allSessions[index].end
     );
     if (originalIndex === -1) return;
 
     const newSessions = sessions.filter((_, i) => i !== originalIndex);
     const newAccumulatedTime = recalculateAccumulatedTime(newSessions);
     onUpdateSessions(task.id, newSessions, newAccumulatedTime);
-  }, [sessions, todaySessions, task.id, onUpdateSessions]);
+  }, [sessions, allSessions, task.id, onUpdateSessions]);
 
   const handleAddSession = useCallback((newSession) => {
     const newSessions = [...sessions, { ...newSession, taskId: task.id }];
@@ -54,7 +52,7 @@ export const WorkSessionList = memo(function WorkSessionList({
     setShowAddForm(false);
   }, [sessions, task.id, onUpdateSessions]);
 
-  if (todaySessions.length === 0 && !showAddForm) {
+  if (allSessions.length === 0 && !showAddForm) {
     return (
       <div style={{ marginTop: '10px' }}>
         <div
@@ -89,20 +87,21 @@ export const WorkSessionList = memo(function WorkSessionList({
         }}
       >
         <span style={{ marginRight: '6px' }}>{isExpanded ? '▼' : '▶'}</span>
-        <span>作業履歴 ({todaySessions.length}件)</span>
+        <span>作業履歴 ({allSessions.length}件)</span>
       </div>
 
       {isExpanded && (
         <div style={{ marginTop: '8px' }}>
-          {todaySessions.map((session, index) => {
+          {allSessions.map((session, index) => {
             const isActive = !session.end && task.status === '作業中';
+            const sessionDateString = getDateString(session.start);
             return (
               <WorkSessionItem
                 key={`${session.start}-${index}`}
                 session={session}
                 index={index}
                 isActive={isActive}
-                dateString={dateString}
+                dateString={sessionDateString}
                 onUpdateSession={handleUpdateSession}
                 onDeleteSession={handleDeleteSession}
               />

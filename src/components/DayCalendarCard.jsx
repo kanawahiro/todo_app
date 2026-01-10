@@ -13,9 +13,17 @@ export const DayCalendarCard = memo(function DayCalendarCard({
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const pixelsPerHour = 60;
 
+  // 当日の0:00と23:59:59
+  const dayStart = new Date(dateString);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dateString);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  // 合計時間を計算（当日内にクリップ）
   const totalSeconds = sessions.reduce((sum, session) => {
-    const start = session.start;
-    const end = session.end || Date.now();
+    const start = Math.max(session.start, dayStart.getTime());
+    const end = Math.min(session.end || Date.now(), dayEnd.getTime());
+    if (end <= start) return sum;
     return sum + Math.floor((end - start) / 1000);
   }, 0);
 
@@ -116,13 +124,19 @@ export const DayCalendarCard = memo(function DayCalendarCard({
           const startDate = new Date(session.start);
           const endDate = session.end ? new Date(session.end) : new Date();
 
-          const startHour = startDate.getHours() + startDate.getMinutes() / 60;
-          const endHour = endDate.getHours() + endDate.getMinutes() / 60;
+          // セッションを当日内にクリップ（dayStart/dayEndはコンポーネント上部で定義済み）
+          const clippedStart = new Date(Math.max(startDate.getTime(), dayStart.getTime()));
+          const clippedEnd = new Date(Math.min(endDate.getTime(), dayEnd.getTime()));
+
+          // クリップ後の時間を計算
+          const startHour = clippedStart.getHours() + clippedStart.getMinutes() / 60;
+          const endHour = clippedEnd.getHours() + clippedEnd.getMinutes() / 60 + clippedEnd.getSeconds() / 3600;
 
           const top = startHour * pixelsPerHour;
           const height = Math.max((endHour - startHour) * pixelsPerHour, 20);
 
-          const durationSec = Math.floor((endDate - startDate) / 1000);
+          // 実際の作業時間（クリップ後）
+          const durationSec = Math.floor((clippedEnd - clippedStart) / 1000);
           const tagColor = getTagColor(task.tag);
           const isActive = !session.end;
 
