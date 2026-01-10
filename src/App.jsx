@@ -34,6 +34,7 @@ function TaskManagerApp({ apiKey }) {
   const [extracted, setExtracted] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState(null);
+  const [aiStatus, setAiStatus] = useState(null); // 'ok' | 'ng' | null
   const [toDelete, setToDelete] = useState(new Set());
   const [period, setPeriod] = useState('week');
   const [expanded, setExpanded] = useState(new Set());
@@ -229,23 +230,37 @@ function TaskManagerApp({ apiKey }) {
         dangerouslyAllowBrowser: true
       });
 
-      const prompt = `あなたは優秀なタスク管理アシスタントです。
-以下のテキストから個別のタスクを抽出し、各タスクについて「タスク名」と「メモ（補足情報）」を分けて抽出してください。
+      const prompt = `あなたはタスク管理アシスタントです。入力テキストからタスクを抽出してJSON配列で出力してください。
 
-抽出ルール:
-1. 各タスクの主要な行動を簡潔な「タスク名」として抽出してください
-   - 例: "商品Aの在庫確認"、"キャンペーンバナー作成"、"顧客に返信"
-   - タスク名は30文字以内の簡潔な表現にしてください
-2. 詳細な手順、条件、期限、数値、サイズ、注意事項などは「memo」欄に記載してください
-   - 例: "倉庫に電話して在庫数確認、50個以下なら発注"
-   - 補足情報がない場合は空文字列にしてください
-3. 各タスクを以下のいずれかのタグに分類してください: ${tags.join(', ')}
-4. 出力はJSON配列のみで、説明や挨拶は一切含めないでください
+【最重要ルール】
+- "name"フィールドは必ず15文字以内の簡潔な動詞句にする
+- 詳細情報は全て"memo"フィールドに入れる
+- 「まず」「次に」「それから」「今日」などの接続詞・時間表現は削除する
 
-出力形式:
-[
-  {"name": "簡潔なタスク名", "tag": "タグ名", "memo": "詳細な補足情報"}
-]
+【タスク名（name）の書き方】
+- 「〜を確認」「〜に返信」「〜を作成」のような動詞で終わる短い表現
+- 数値、期限、条件、詳細は含めない
+- 例: "メール返信", "在庫確認", "動画作成", "資料送付"
+
+【メモ（memo）の書き方】
+- タスク名に含まれない全ての詳細情報を記載
+- 数量、期限、条件、注意事項、補足説明など
+- 該当なしの場合のみ空文字列 ""
+
+【入出力例】
+入力: "次に派遣のメールに返信を行う。確か商品の素材を記入する必要がある。"
+出力: {"name": "派遣メールに返信", "tag": "雑務", "memo": "商品の素材を記入する必要あり"}
+
+入力: "会津にリスト26箱を出します。在庫切れで早めに欲しい商品があれば確認"
+出力: {"name": "会津にリスト出し", "tag": "受注発送関連", "memo": "26箱、在庫切れで早めに欲しい商品を確認"}
+
+入力: "在庫の計算の方法を動画にしてまとめる。これは標準になって綾さんに伝える。"
+出力: {"name": "在庫計算動画作成", "tag": "雑務", "memo": "標準化して綾さんに伝える"}
+
+【タグの選択肢】: ${tags.join(', ')}
+
+【出力形式】JSON配列のみ。説明文や挨拶は不要。
+[{"name": "短いタスク名", "tag": "タグ", "memo": "詳細情報"}]
 
 入力テキスト:
 ${input}`;
@@ -265,7 +280,13 @@ ${input}`;
       const match = text.match(/\[[\s\S]*\]/);
       if (match) text = match[0];
 
+      console.log('API応答（生）:', text);
       const parsed = JSON.parse(text);
+      console.log('✓ タスク抽出成功:', parsed.length, '件のタスクを抽出');
+      parsed.forEach((t, i) => {
+        console.log(`  ${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'}`);
+      });
+      setAiStatus('ok');
       setExtracted(parsed.map((t, i) => ({
         ...t,
         tid: Date.now() + i
@@ -287,16 +308,48 @@ ${input}`;
 
       errorMsg += ' (改行で区切ってタスクを作成します)';
       setExtractError(errorMsg);
+      setAiStatus('ng');
 
       // テキスト形式の \n を実際の改行に変換してから分割
       const normalizedInput = input.replace(/\\n/g, '\n');
       const lines = normalizedInput.split('\n').filter(l => l.trim());
-      setExtracted(lines.map((l, i) => ({
-        name: l.trim(),
-        tag: tags[0] || '',
-        memo: '',
-        tid: Date.now() + i
-      })));
+
+      const fallbackExtracted = lines.map((line, i) => {
+        // 箇条書き記号を削除
+        let cleaned = line
+          .replace(/^[\-\•\*]\s+/, '')           // -, •, * で始まる
+          .replace(/^\d+[\.\)]\s+/, '')          // 1. または 1) で始まる
+          .trim();
+
+        // タスク名とメモの簡易分離
+        let name = cleaned;
+        let memo = '';
+
+        const separators = ['。', ':', '：'];
+        for (const sep of separators) {
+          const idx = cleaned.indexOf(sep);
+          if (idx > 0 && idx < 30) {
+            name = cleaned.substring(0, idx).trim();
+            memo = cleaned.substring(idx + 1).trim();
+            break;
+          }
+        }
+
+        // タスク名が長すぎる場合は切り詰め
+        if (name.length > 30 && !memo) {
+          memo = name;
+          name = name.substring(0, 27) + '...';
+        }
+
+        return {
+          name,
+          tag: tags[0] || '',
+          memo,
+          tid: Date.now() + i
+        };
+      });
+
+      setExtracted(fallbackExtracted);
     }
     setExtracting(false);
   };
@@ -864,6 +917,7 @@ ${input}`;
             setNewTag={setNewTag}
             addTag={addTag}
             deleteTagStart={deleteTagStart}
+            aiStatus={aiStatus}
           />
         )}
 

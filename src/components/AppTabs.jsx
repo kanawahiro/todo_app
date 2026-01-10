@@ -21,7 +21,8 @@ export function RegisterTab({
   newTag,
   setNewTag,
   addTag,
-  deleteTagStart
+  deleteTagStart,
+  aiStatus
 }) {
   return (
     <div>
@@ -50,7 +51,33 @@ export function RegisterTab({
 
       {extracted.length > 0 && (
         <div style={{ marginTop: '24px' }}>
-          <h3 style={{ marginBottom: '12px' }}>抽出タスク:</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <h3 style={{ margin: 0 }}>抽出タスク:</h3>
+            {aiStatus === 'ok' && (
+              <span style={{
+                background: '#22c55e',
+                color: 'white',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '0.85rem',
+                fontWeight: 'bold'
+              }}>
+                AI処理OK
+              </span>
+            )}
+            {aiStatus === 'ng' && (
+              <span style={{
+                background: '#ef4444',
+                color: 'white',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '0.85rem',
+                fontWeight: 'bold'
+              }}>
+                AI NG
+              </span>
+            )}
+          </div>
           {extracted.map(task => (
             <div
               key={task.tid}
