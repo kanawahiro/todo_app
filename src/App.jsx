@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import Anthropic from '@anthropic-ai/sdk';
 import { RegisterTab, TodayTab, CalendarTab, DatabaseTab, ReviewTab } from './components/AppTabs.jsx';
 import { calculateElapsedTime, getDateString } from './utils/formatters.js';
 import { styles } from './styles/styles.js';
@@ -8,8 +7,6 @@ import { styles } from './styles/styles.js';
 const SAVE_DEBOUNCE_MS = 500;
 const TIMER_INTERVAL_MS = 1000;
 const FOCUS_DELAY_MS = 50;
-const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
-const CLAUDE_MAX_TOKENS = 2000;
 
 // Vercel API エンドポイント（本番環境用）
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -65,15 +62,6 @@ function TaskManagerApp({ apiKey }) {
   const hasActiveTask = useMemo(() => {
     return tasks.some(t => t.status === '作業中');
   }, [tasks]);
-
-  // APIキーのバリデーション
-  useEffect(() => {
-    if (!apiKey) {
-      console.warn('⚠️ Anthropic Claude APIキーが設定されていません。AI機能（タスク抽出・振り返り）は無効です。');
-    } else {
-      console.info('✅ Anthropic Claude APIキーが設定されています。');
-    }
-  }, [apiKey]);
 
   useEffect(() => {
     async function loadData() {
@@ -214,182 +202,47 @@ function TaskManagerApp({ apiKey }) {
     if (!input.trim()) return;
     setExtracting(true);
     setExtractError(null);
-    setAiStatus(null); // リセット
+    setAiStatus(null);
 
-    // 修正案1: APIキーのデバッグ出力
     console.log('=== タスク抽出開始 ===');
-    console.log('APIキー存在:', !!apiKey);
-    console.log('APIキー先頭:', apiKey ? apiKey.substring(0, 20) + '...' : 'なし');
-
-    // APIキーがない場合はVercel API経由で呼び出し
-    if (!apiKey) {
-      console.log('APIキーなし - Vercel API経由で呼び出し');
-
-      // Vercel APIのURLを決定
-      const apiUrl = API_BASE_URL ? `${API_BASE_URL}/api/extract-tasks` : '/api/extract-tasks';
-      console.log('API URL:', apiUrl);
-
-      try {
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input, tags })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('Vercel API応答:', data);
-
-        if (data.success && data.tasks) {
-          console.log('✓ タスク抽出成功:', data.tasks.length, '件のタスクを抽出');
-          data.tasks.forEach((t, i) => {
-            console.log(`  ${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'}`);
-          });
-          setAiStatus('ok');
-          setExtracted(data.tasks.map((t, i) => ({
-            ...t,
-            tid: Date.now() + i
-          })));
-          setExtracting(false);
-          return;
-        } else {
-          throw new Error('Invalid response from API');
-        }
-      } catch (e) {
-        console.error('Vercel API エラー:', e);
-        setExtractError(`AI抽出に失敗しました: ${e.message} (改行で区切ってタスクを作成します)`);
-        setAiStatus('ng');
-
-        // フォールバック処理
-        const normalizedInput = input.replace(/\\n/g, '\n');
-        const lines = normalizedInput.split('\n').filter(l => l.trim());
-
-        const fallbackExtracted = lines.map((line, i) => {
-          let cleaned = line
-            .replace(/^[\-\•\*]\s+/, '')
-            .replace(/^\d+[\.\)]\s+/, '')
-            .trim();
-
-          let name = cleaned;
-          let memo = '';
-
-          const separators = ['。', ':', '：'];
-          for (const sep of separators) {
-            const idx = cleaned.indexOf(sep);
-            if (idx > 0 && idx < 30) {
-              name = cleaned.substring(0, idx).trim();
-              memo = cleaned.substring(idx + 1).trim();
-              break;
-            }
-          }
-
-          if (name.length > 30 && !memo) {
-            memo = name;
-            name = name.substring(0, 27) + '...';
-          }
-
-          return {
-            name,
-            tag: tags[0] || '',
-            memo,
-            tid: Date.now() + i
-          };
-        });
-
-        setExtracted(fallbackExtracted);
-        setExtracting(false);
-        return;
-      }
-    }
+    const apiUrl = API_BASE_URL ? `${API_BASE_URL}/api/extract-tasks` : '/api/extract-tasks';
+    console.log('API URL:', apiUrl);
 
     try {
-      // 修正案3: API呼び出しの詳細なログ
-      console.log('=== API呼び出し開始 ===');
-      console.log('モデル:', CLAUDE_MODEL);
-      console.log('max_tokens:', CLAUDE_MAX_TOKENS);
-      console.log('入力テキスト長:', input.length, '文字');
-
-      const client = new Anthropic({
-        apiKey: apiKey,
-        dangerouslyAllowBrowser: true
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, tags })
       });
 
-      const prompt = `あなたはタスク管理アシスタントです。入力テキストからタスクを抽出してJSON配列で出力してください。
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
 
-【最重要ルール】
-- "name"フィールドは必ず15文字以内の簡潔な動詞句にする
-- 詳細情報は全て"memo"フィールドに入れる
-- 「まず」「次に」「それから」「今日」などの接続詞・時間表現は削除する
+      const data = await response.json();
+      console.log('Vercel API応答:', data);
 
-【タスク名（name）の書き方】
-- 「〜を確認」「〜に返信」「〜を作成」のような動詞で終わる短い表現
-- 数値、期限、条件、詳細は含めない
-- 例: "メール返信", "在庫確認", "動画作成", "資料送付"
-
-【メモ（memo）の書き方】
-- タスク名に含まれない全ての詳細情報を記載
-- 数量、期限、条件、注意事項、補足説明など
-- 該当なしの場合のみ空文字列 ""
-
-【入出力例】
-入力: "次に派遣のメールに返信を行う。確か商品の素材を記入する必要がある。"
-出力: {"name": "派遣メールに返信", "tag": "雑務", "memo": "商品の素材を記入する必要あり"}
-
-入力: "会津にリスト26箱を出します。在庫切れで早めに欲しい商品があれば確認"
-出力: {"name": "会津にリスト出し", "tag": "受注発送関連", "memo": "26箱、在庫切れで早めに欲しい商品を確認"}
-
-入力: "在庫の計算の方法を動画にしてまとめる。これは標準になって綾さんに伝える。"
-出力: {"name": "在庫計算動画作成", "tag": "雑務", "memo": "標準化して綾さんに伝える"}
-
-【タグの選択肢】: ${tags.join(', ')}
-
-【出力形式】JSON配列のみ。説明文や挨拶は不要。
-[{"name": "短いタスク名", "tag": "タグ", "memo": "詳細情報"}]
-
-入力テキスト:
-${input}`;
-
-      console.log('API呼び出し中...');
-      const response = await client.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: CLAUDE_MAX_TOKENS,
-        messages: [
-          { role: 'user', content: prompt }
-        ]
-      });
-      console.log('=== API応答受信 ===');
-      console.log('ステータス:', response.stop_reason);
-      console.log('使用トークン:', response.usage);
-
-      let text = response.content[0].text;
-
-      // JSONのみを抽出するためのクリーニング
-      text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const match = text.match(/\[[\s\S]*\]/);
-      if (match) text = match[0];
-
-      console.log('API応答（生）:', text);
-      const parsed = JSON.parse(text);
-      console.log('✓ タスク抽出成功:', parsed.length, '件のタスクを抽出');
-      parsed.forEach((t, i) => {
-        console.log(`  ${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'}`);
-      });
-      setAiStatus('ok');
-      setExtracted(parsed.map((t, i) => ({
-        ...t,
-        tid: Date.now() + i
-      })));
+      if (data.success && data.tasks) {
+        console.log('✓ タスク抽出成功:', data.tasks.length, '件のタスクを抽出');
+        data.tasks.forEach((t, i) => {
+          console.log(`  ${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'}`);
+        });
+        setAiStatus('ok');
+        setExtracted(data.tasks.map((t, i) => ({
+          ...t,
+          tid: Date.now() + i
+        })));
+      } else {
+        throw new Error('Invalid response from API');
+      }
     } catch (e) {
-      console.error('タスク抽出エラー詳細:', e);
+      console.error('タスク抽出エラー:', e);
       let errorMsg = 'AI抽出に失敗しました。';
 
       const errorStr = (e.message || '') + (e.stack || '');
-      if (errorStr.includes('invalid_api_key') || errorStr.includes('401')) {
-        errorMsg = 'APIキーが無効です。設定を確認してください。';
+      if (errorStr.includes('API key not configured') || errorStr.includes('401')) {
+        errorMsg = 'Gemini APIキーが設定されていません。Vercel環境変数を確認してください。';
       } else if (errorStr.includes('rate_limit') || errorStr.includes('429')) {
         errorMsg = 'API利用上限に達しました。しばらく待ってから再試行してください。';
       } else if (errorStr.includes('400')) {
@@ -402,18 +255,16 @@ ${input}`;
       setExtractError(errorMsg);
       setAiStatus('ng');
 
-      // テキスト形式の \n を実際の改行に変換してから分割
+      // フォールバック処理
       const normalizedInput = input.replace(/\\n/g, '\n');
       const lines = normalizedInput.split('\n').filter(l => l.trim());
 
       const fallbackExtracted = lines.map((line, i) => {
-        // 箇条書き記号を削除
         let cleaned = line
-          .replace(/^[\-\•\*]\s+/, '')           // -, •, * で始まる
-          .replace(/^\d+[\.\)]\s+/, '')          // 1. または 1) で始まる
+          .replace(/^[\-\•\*]\s+/, '')
+          .replace(/^\d+[\.\)]\s+/, '')
           .trim();
 
-        // タスク名とメモの簡易分離
         let name = cleaned;
         let memo = '';
 
@@ -427,7 +278,6 @@ ${input}`;
           }
         }
 
-        // タスク名が長すぎる場合は切り詰め
         if (name.length > 30 && !memo) {
           memo = name;
           name = name.substring(0, 27) + '...';
@@ -780,72 +630,41 @@ ${input}`;
     const completedCount = reviewTasks.filter(t => t.status === '完了').length;
     const totalCount = reviewTasks.length;
 
-    // APIキーがない場合はVercel API経由で呼び出し
-    if (!apiKey) {
-      console.log('APIキーなし - Vercel API経由で振り返り生成');
-
-      const apiUrl = API_BASE_URL ? `${API_BASE_URL}/api/generate-review` : '/api/generate-review';
-
-      try {
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ period, totalCount, completedCount })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.success && data.review) {
-          setAiReview(data.review);
-        } else {
-          throw new Error('Invalid response from API');
-        }
-      } catch (e) {
-        console.error('Vercel API エラー:', e);
-        setReviewError(`AI分析に失敗しました: ${e.message}`);
-        setAiReview('');
-      }
-      setReviewing(false);
-      return;
-    }
+    const apiUrl = API_BASE_URL ? `${API_BASE_URL}/api/generate-review` : '/api/generate-review';
 
     try {
-      const client = new Anthropic({
-        apiKey: apiKey,
-        dangerouslyAllowBrowser: true
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period, totalCount, completedCount })
       });
 
-      const prompt = `タスク振り返り。期間:${period === 'week' ? '1週間' : '1ヶ月'}。総数:${totalCount}件、完了:${completedCount}件。形式:\n【よかった点】\n・\n【改善点】\n・\n【次への提案】\n・`;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
 
-      const response = await client.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: CLAUDE_MAX_TOKENS,
-        messages: [
-          { role: 'user', content: prompt }
-        ]
-      });
-
-      let text = response.content[0].text;
-      // Markdownのコードブロックが含まれている場合の除去
-      text = text.replace(/```markdown/g, '').replace(/```/g, '').trim();
-      setAiReview(text);
+      const data = await response.json();
+      if (data.success && data.review) {
+        setAiReview(data.review);
+      } else {
+        throw new Error('Invalid response from API');
+      }
     } catch (e) {
-      console.error('レビュー生成エラー:', e);
-      let errorMsg = 'AI分析の生成に失敗しました。';
+      console.error('振り返り生成エラー:', e);
+      let errorMsg = 'AI振り返り生成に失敗しました。';
+
       const errorStr = (e.message || '') + (e.stack || '');
-      if (errorStr.includes('invalid_api_key') || errorStr.includes('401')) {
-        errorMsg = 'APIキーが無効です。設定を確認してください。';
+      if (errorStr.includes('API key not configured') || errorStr.includes('401')) {
+        errorMsg = 'Gemini APIキーが設定されていません。Vercel環境変数を確認してください。';
       } else if (errorStr.includes('rate_limit') || errorStr.includes('429')) {
         errorMsg = 'API利用上限に達しました。しばらく待ってから再試行してください。';
       } else if (errorStr.includes('400')) {
         errorMsg = 'リクエストが無効です。モデル名やパラメータを確認してください。';
       } else if (e.message) {
-        errorMsg = `AI分析エラー: ${e.message.substring(0, 100)}`;
+        errorMsg = `AI振り返りエラー: ${e.message.substring(0, 100)}`;
       }
+
       setReviewError(errorMsg);
       setAiReview('');
     }

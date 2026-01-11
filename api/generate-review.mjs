@@ -1,7 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
-const CLAUDE_MAX_TOKENS = 2000;
+const GEMINI_MODEL = 'gemini-3-flash-preview';
 
 export default async function handler(req, res) {
   // CORSヘッダーを設定
@@ -22,33 +21,43 @@ export default async function handler(req, res) {
   try {
     const { period, totalCount, completedCount } = req.body;
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
+      return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
-    const client = new Anthropic({ apiKey });
+    // Gemini AI初期化
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL
+    });
 
     const prompt = `タスク振り返り。期間:${period === 'week' ? '1週間' : '1ヶ月'}。総数:${totalCount}件、完了:${completedCount}件。形式:\n【よかった点】\n・\n【改善点】\n・\n【次への提案】\n・`;
 
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: CLAUDE_MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }]
-    });
+    // Gemini API呼び出し（Text Mode）
+    const result = await model.generateContent(prompt);
 
-    let text = response.content[0].text;
-    // Markdownのコードブロックが含まれている場合の除去
+    // レスポンス取得
+    const response = await result.response;
+    let text = response.text();
+
+    // マークダウンコードブロック除去（念のため）
     text = text.replace(/```markdown/g, '').replace(/```/g, '').trim();
+
+    // 使用量情報取得
+    const usageMetadata = response.usageMetadata || {};
 
     return res.status(200).json({
       success: true,
       review: text,
-      usage: response.usage
+      usage: {
+        input_tokens: usageMetadata.promptTokenCount || 0,
+        output_tokens: usageMetadata.candidatesTokenCount || 0
+      }
     });
 
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('Gemini API Error:', error);
     return res.status(500).json({
       error: error.message || 'Internal server error',
       details: error.toString()

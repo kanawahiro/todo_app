@@ -11,7 +11,7 @@
     "deploy": "GITHUB_PAGES=true vite build && gh-pages -d dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.24.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

@@ -1,7 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
-const CLAUDE_MAX_TOKENS = 2000;
+const GEMINI_MODEL = 'gemini-3-flash-preview';
 
 export default async function handler(req, res) {
   // CORSヘッダーを設定
@@ -26,12 +25,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Input is required' });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
+      return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
-    const client = new Anthropic({ apiKey });
+    // Gemini AI初期化
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL
+    });
 
     const prompt = `あなたはタスク管理アシスタントです。入力テキストからタスクを抽出してJSON配列で出力してください。
 
@@ -68,29 +71,47 @@ export default async function handler(req, res) {
 入力テキスト:
 ${input}`;
 
-    const response = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: CLAUDE_MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }]
+    // Gemini API呼び出し (JSON Mode使用)
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              tag: { type: "string" },
+              memo: { type: "string" }
+            },
+            required: ["name", "tag", "memo"]
+          }
+        }
+      }
     });
 
-    let text = response.content[0].text;
+    // レスポンス取得
+    const response = await result.response;
+    const text = response.text();
 
-    // JSONのみを抽出するためのクリーニング
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const match = text.match(/\[[\s\S]*\]/);
-    if (match) text = match[0];
-
+    // JSON Mode使用時はクリーニング不要、直接パース
     const parsed = JSON.parse(text);
+
+    // 使用量情報取得（オプション）
+    const usageMetadata = response.usageMetadata || {};
 
     return res.status(200).json({
       success: true,
       tasks: parsed,
-      usage: response.usage
+      usage: {
+        input_tokens: usageMetadata.promptTokenCount || 0,
+        output_tokens: usageMetadata.candidatesTokenCount || 0
+      }
     });
 
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('Gemini API Error:', error);
     return res.status(500).json({
       error: error.message || 'Internal server error',
       details: error.toString()
