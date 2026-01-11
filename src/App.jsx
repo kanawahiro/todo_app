@@ -73,7 +73,8 @@ function TaskManagerApp({ apiKey }) {
             ...t,
             accumulatedTime: t.accumulatedTime ?? t.elapsedTime ?? 0,
             startedAt: t.startedAt ?? null,
-            workSessions: t.workSessions ?? []
+            workSessions: t.workSessions ?? [],
+            estimatedMinutes: t.estimatedMinutes ?? 0
           }));
           setTasks(migratedTasks);
         }
@@ -231,7 +232,8 @@ function TaskManagerApp({ apiKey }) {
         setAiStatus('ok');
         setExtracted(data.tasks.map((t, i) => ({
           ...t,
-          tid: Date.now() + i
+          tid: Date.now() + i,
+          estimatedMinutes: 0
         })));
       } else {
         throw new Error('Invalid response from API');
@@ -287,7 +289,8 @@ function TaskManagerApp({ apiKey }) {
           name,
           tag: tags[0] || '',
           memo,
-          tid: Date.now() + i
+          tid: Date.now() + i,
+          estimatedMinutes: 0
         };
       });
 
@@ -310,6 +313,7 @@ function TaskManagerApp({ apiKey }) {
           name: t.name,
           memo: t.memo,
           tag: t.tag,
+          estimatedMinutes: t.estimatedMinutes || 0,
           status: '未着手',
           statusComment: '',
           registeredDate: today,
@@ -562,6 +566,7 @@ function TaskManagerApp({ apiKey }) {
       name: '',
       memo: '',
       tag: tag,
+      estimatedMinutes: 0,
       status: '未着手',
       statusComment: '',
       registeredDate: today,

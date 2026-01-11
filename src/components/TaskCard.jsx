@@ -76,6 +76,32 @@ export const TaskCard = memo(function TaskCard({
         placeholder="📝 メモ"
         style={{ ...styles.input, marginBottom: '8px', padding: '6px 10px', fontSize: '0.85rem' }}
       />
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '8px',
+        fontSize: '0.85rem'
+      }}>
+        <label style={{ color: '#6b6b6b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          ⏱️ 見積:
+        </label>
+        <input
+          type="number"
+          value={task.estimatedMinutes || ''}
+          onChange={(e) => onUpdateTask(task.id, 'estimatedMinutes', Number(e.target.value) || 0)}
+          placeholder="0"
+          min="0"
+          step="5"
+          style={{
+            ...styles.input,
+            width: '60px',
+            padding: '4px 8px',
+            textAlign: 'right'
+          }}
+        />
+        <span style={{ color: '#6b6b6b' }}>分</span>
+      </div>
       <div style={{ fontSize: '0.8rem', color: '#6b6b6b', marginBottom: '8px' }}>
         📅 登録: {formatDateShort(task.registeredDate)}
       </div>

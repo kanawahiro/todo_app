@@ -107,7 +107,7 @@ export function RegisterTab({
                   style={{ ...styles.input, flex: 1 }}
                 />
               </div>
-              <div style={{ display: 'flex', gap: '8px', marginLeft: '26px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginLeft: '26px', flexWrap: 'wrap' }}>
                 <input
                   type="text"
                   value={task.memo}
@@ -115,8 +115,29 @@ export function RegisterTab({
                     prev.map(t => t.tid === task.tid ? { ...t, memo: e.target.value } : t)
                   )}
                   placeholder="メモ"
-                  style={{ ...styles.input, flex: 1 }}
+                  style={{ ...styles.input, flex: 1, minWidth: '150px' }}
                 />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <label style={{ fontSize: '0.85rem', color: '#888' }}>見積:</label>
+                  <input
+                    type="number"
+                    value={task.estimatedMinutes || ''}
+                    onChange={(e) => setExtracted(prev =>
+                      prev.map(t => t.tid === task.tid
+                        ? { ...t, estimatedMinutes: Number(e.target.value) || 0 }
+                        : t)
+                    )}
+                    placeholder="0"
+                    min="0"
+                    step="5"
+                    style={{
+                      ...styles.input,
+                      width: '60px',
+                      textAlign: 'right'
+                    }}
+                  />
+                  <span style={{ fontSize: '0.85rem', color: '#888' }}>分</span>
+                </div>
                 <select
                   value={task.tag}
                   onChange={(e) => setExtracted(prev =>
