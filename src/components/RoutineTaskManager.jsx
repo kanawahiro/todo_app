@@ -35,6 +35,12 @@ export function RoutineTaskManager({
     setSelectedIds(new Set());
   };
 
+  const handleAddAllToday = () => {
+    if (todayTasks.length === 0) return;
+    const todayTaskIds = todayTasks.map(t => t.id);
+    onAddMultipleToToday(todayTaskIds);
+  };
+
   // 今日のタスクと、それ以外に分類
   const todayTasks = routineTasks.filter(isTodayTask);
   const otherTasks = routineTasks.filter(t => !isTodayTask(t));
@@ -43,18 +49,34 @@ export function RoutineTaskManager({
     <div style={styles.routineSection}>
       <div style={styles.routineHeader}>
         <h3>📅 ルーティンタスク</h3>
-        {selectedIds.size > 0 && (
-          <button
-            onClick={handleAddMultiple}
-            style={{
-              ...styles.btn,
-              background: '#22c55e',
-              marginTop: 0
-            }}
-          >
-            ✓ 選択したタスクを今日に追加 ({selectedIds.size}件)
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {todayTasks.length > 0 && (
+            <button
+              onClick={handleAddAllToday}
+              style={{
+                ...styles.btn,
+                background: '#10b981',
+                marginTop: 0,
+                fontSize: '0.85rem'
+              }}
+            >
+              ✨ 今日の予定をすべて追加
+            </button>
+          )}
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleAddMultiple}
+              style={{
+                ...styles.btn,
+                background: '#22c55e',
+                marginTop: 0,
+                fontSize: '0.85rem'
+              }}
+            >
+              ✓ 選択したタスクを今日に追加 ({selectedIds.size}件)
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 今日のタスク */}
