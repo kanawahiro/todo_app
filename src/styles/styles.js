@@ -1,101 +1,148 @@
 export const styles = {
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+    background: '#fbf9f4',
     fontFamily: 'sans-serif',
-    color: '#e8e8e8'
+    color: '#2d2c2c'
   },
   header: {
     padding: '20px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)'
+    borderBottom: '1px solid rgba(0,0,0,0.06)'
   },
   title: {
     fontSize: '1.5rem',
     fontWeight: 'bold',
     margin: 0,
-    color: '#00d4ff'
+    color: '#2d2c2c',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
   },
   tabNav: {
     display: 'flex',
     gap: '4px',
     padding: '12px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    flexWrap: 'wrap'
+    borderBottom: '1px solid rgba(0,0,0,0.06)',
+    flexWrap: 'wrap',
+    background: '#fbf9f4'
   },
   tabBtn: {
-    padding: '10px 20px',
+    padding: '8px 16px',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '6px',
     background: 'transparent',
-    color: '#888',
+    color: '#6b6b6b',
     cursor: 'pointer',
-    fontSize: '0.9rem'
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    transition: 'all 0.2s ease'
   },
   tabBtnActive: {
-    background: 'rgba(0,212,255,0.15)',
-    color: '#00d4ff'
+    background: '#eff6ff',
+    color: '#2563eb',
+    fontWeight: 'bold'
   },
   main: {
-    padding: '20px 24px'
+    padding: '24px'
   },
   btn: {
-    padding: '12px 24px',
+    padding: '10px 20px',
     borderRadius: '8px',
     border: 'none',
-    background: 'linear-gradient(90deg, #00d4ff, #7b2cbf)',
-    color: '#fff',
+    background: '#2563eb',
+    color: '#ffffff',
     fontWeight: 'bold',
     cursor: 'pointer',
-    marginTop: '12px'
+    marginTop: '12px',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    transition: 'background 0.2s'
   },
   input: {
     padding: '10px 12px',
     borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255,255,255,0.05)',
-    color: '#e8e8e8',
+    border: '1px solid #e5e7eb',
+    background: '#ffffff',
+    color: '#2d2c2c',
     fontSize: '1rem',
     width: '100%',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    outline: 'none',
+    transition: 'border-color 0.2s'
   },
   textarea: {
     padding: '12px',
     borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255,255,255,0.05)',
-    color: '#e8e8e8',
+    border: '1px solid #e5e7eb',
+    background: '#ffffff',
+    color: '#2d2c2c',
     fontSize: '1rem',
     width: '100%',
     minHeight: '100px',
     boxSizing: 'border-box',
-    resize: 'vertical'
+    resize: 'vertical',
+    outline: 'none'
+  },
+  column: {
+    minWidth: '280px',
+    maxWidth: '320px',
+    background: 'transparent',
+    borderRadius: '12px',
+    padding: '0',
+    marginRight: '24px',
+    marginBottom: '16px'
   },
   card: {
-    background: 'rgba(255,255,255,0.05)',
+    background: '#ffffff',
     borderRadius: '10px',
-    padding: '14px',
+    padding: '16px',
     marginBottom: '12px',
-    borderLeft: '4px solid'
+    border: '1px solid #e5e7eb',
+    borderLeft: '4px solid',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
   },
   actionBtn: {
     padding: '6px 12px',
     borderRadius: '6px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255,255,255,0.05)',
-    color: '#ccc',
+    border: '1px solid #e5e7eb',
+    background: '#ffffff',
+    color: '#6b6b6b',
     cursor: 'pointer',
     fontSize: '0.8rem',
     marginRight: '6px',
-    marginBottom: '6px'
+    marginBottom: '6px',
+    transition: 'all 0.1s'
   },
   deleteBtn: {
     padding: '6px 12px',
     borderRadius: '6px',
-    border: '1px solid #ef4444',
-    background: 'rgba(239,68,68,0.1)',
+    border: '1px solid #fee2e2',
+    background: '#fef2f2',
     color: '#ef4444',
     cursor: 'pointer',
     fontSize: '0.8rem'
+  },
+  chip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    background: '#eff6ff',
+    color: '#2563eb',
+    fontSize: '0.85rem',
+    marginRight: '8px',
+    marginBottom: '8px',
+    border: '1px solid #dbeafe'
+  },
+  timeInput: {
+    padding: '6px 8px',
+    borderRadius: '6px',
+    border: '1px solid #e5e7eb',
+    background: '#ffffff',
+    color: '#2d2c2c',
+    fontSize: '0.9rem',
+    width: '90px',
+    textAlign: 'center'
   },
   overlay: {
     position: 'fixed',
@@ -103,73 +150,44 @@ export const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0,0,0,0.7)',
+    background: 'rgba(0,0,0,0.4)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000
   },
   dialog: {
-    background: '#1a1a2e',
+    background: '#ffffff',
     borderRadius: '16px',
     padding: '24px',
     maxWidth: '400px',
-    width: '90%'
-  },
-  chip: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '6px 12px',
-    borderRadius: '20px',
-    background: 'rgba(0,212,255,0.15)',
-    color: '#00d4ff',
-    fontSize: '0.85rem',
-    marginRight: '8px',
-    marginBottom: '8px'
-  },
-  column: {
-    minWidth: '280px',
-    maxWidth: '320px',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: '12px',
-    padding: '16px',
-    marginRight: '16px',
-    marginBottom: '16px'
+    width: '90%',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
   },
   error: {
-    background: 'rgba(239,68,68,0.1)',
-    border: '1px solid #ef4444',
+    background: '#fef2f2',
+    border: '1px solid #fee2e2',
     borderRadius: '8px',
     padding: '12px',
     color: '#ef4444',
     marginBottom: '12px'
   },
-  timeInput: {
-    padding: '6px 8px',
-    borderRadius: '6px',
-    border: '1px solid rgba(255,255,255,0.2)',
-    background: 'rgba(255,255,255,0.05)',
-    color: '#e8e8e8',
-    fontSize: '0.9rem',
-    width: '90px',
-    textAlign: 'center'
-  },
   timeInputError: {
     borderColor: '#ef4444',
-    background: 'rgba(239,68,68,0.1)'
+    background: '#fef2f2'
   },
   sessionItem: {
-    background: 'rgba(0,0,0,0.2)',
+    background: '#f9fafb',
     borderRadius: '8px',
     padding: '10px 12px',
-    marginBottom: '8px'
+    marginBottom: '8px',
+    border: '1px solid #e5e7eb'
   },
   sessionDeleteBtn: {
     padding: '4px 8px',
     borderRadius: '4px',
-    border: '1px solid #ef4444',
-    background: 'transparent',
+    border: '1px solid #fee2e2',
+    background: '#fef2f2',
     color: '#ef4444',
     cursor: 'pointer',
     fontSize: '0.75rem'
@@ -177,9 +195,9 @@ export const styles = {
   addSessionBtn: {
     padding: '8px 16px',
     borderRadius: '6px',
-    border: '1px dashed rgba(255,255,255,0.3)',
+    border: '1px dashed #e5e7eb',
     background: 'transparent',
-    color: '#888',
+    color: '#6b6b6b',
     cursor: 'pointer',
     fontSize: '0.85rem',
     width: '100%',

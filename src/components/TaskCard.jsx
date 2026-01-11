@@ -20,9 +20,14 @@ export const TaskCard = memo(function TaskCard({
   inputRef
 }) {
   const statusColor = getStatusColor(task.status);
+  const isWorking = task.status === '作業中';
 
   return (
-    <div style={{ ...styles.card, borderLeftColor: statusColor }}>
+    <div style={{
+      ...styles.card,
+      borderLeftColor: statusColor,
+      background: isWorking ? '#eff6ff' : '#ffffff'
+    }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <span>{getStatusIcon(task.status)}</span>
         <input
@@ -41,8 +46,8 @@ export const TaskCard = memo(function TaskCard({
               padding: '2px 6px',
               fontSize: '0.7rem',
               background: 'transparent',
-              border: '1px solid #444',
-              color: '#888',
+              border: '1px solid #e5e7eb',
+              color: '#6b6b6b',
               borderRadius: '4px',
               cursor: index === 0 ? 'not-allowed' : 'pointer',
               opacity: index === 0 ? 0.5 : 1
@@ -55,8 +60,8 @@ export const TaskCard = memo(function TaskCard({
               padding: '2px 6px',
               fontSize: '0.7rem',
               background: 'transparent',
-              border: '1px solid #444',
-              color: '#888',
+              border: '1px solid #e5e7eb',
+              color: '#6b6b6b',
               borderRadius: '4px',
               cursor: index === listLength - 1 ? 'not-allowed' : 'pointer',
               opacity: index === listLength - 1 ? 0.5 : 1
@@ -71,12 +76,12 @@ export const TaskCard = memo(function TaskCard({
         placeholder="📝 メモ"
         style={{ ...styles.input, marginBottom: '8px', padding: '6px 10px', fontSize: '0.85rem' }}
       />
-      <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '8px' }}>
+      <div style={{ fontSize: '0.8rem', color: '#6b6b6b', marginBottom: '8px' }}>
         📅 登録: {formatDateShort(task.registeredDate)}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '8px' }}>
         <span style={{ color: statusColor }}>{task.status}</span>
-        <span style={{ color: '#888' }}>⏱️ {formatTime(elapsedTime)}</span>
+        <span style={{ color: '#6b6b6b' }}>⏱️ {formatTime(elapsedTime)}</span>
       </div>
       <input
         type="text"

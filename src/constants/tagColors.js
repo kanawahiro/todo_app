@@ -8,6 +8,20 @@ export const tagColors = {
   'default': { bg: 'rgba(107, 114, 128, 0.3)', border: '#6b7280' }
 };
 
+// タグヘッダー用の背景色定義（Cream & Blueテーマ対応）
+export const tagHeaderColors = {
+  '売上アップ': { bg: '#dbeafe', text: '#1e40af' },
+  '雑務': { bg: '#f3f4f6', text: '#4b5563' },
+  '仕入れ': { bg: '#d1fae5', text: '#065f46' },
+  '広告': { bg: '#fed7aa', text: '#9a3412' },
+  '受注発送関連': { bg: '#e9d5ff', text: '#6b21a8' },
+  'default': { bg: '#f3f4f6', text: '#6b7280' }
+};
+
+export const getTagHeaderColor = (tag) => {
+  return tagHeaderColors[tag] || tagHeaderColors['default'];
+};
+
 export const getTagColor = (tag) => {
   return tagColors[tag] || tagColors['default'];
 };
@@ -15,7 +29,7 @@ export const getTagColor = (tag) => {
 // ステータスごとの色定義
 export const statusColors = {
   '未着手': '#6b7280',
-  '作業中': '#ef4444',
+  '作業中': '#2563eb',
   '中断中': '#eab308',
   '待ち': '#f97316',
   '完了': '#22c55e'
