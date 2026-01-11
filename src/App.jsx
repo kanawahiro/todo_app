@@ -25,6 +25,7 @@ const getTodayDate = () => {
 function TaskManagerApp({ apiKey }) {
   const [tab, setTab] = useState('register');
   const [tasks, setTasks] = useState([]);
+  const [routineTasks, setRoutineTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [tags, setTags] = useState(['売上アップ', '雑務', '仕入れ', '広告', '受注発送関連']);
@@ -101,6 +102,15 @@ function TaskManagerApp({ apiKey }) {
         console.error('タグ読み込みエラー:', e);
       }
 
+      try {
+        const routineData = await window.storage.get('routineTasks');
+        if (routineData && routineData.value) {
+          setRoutineTasks(JSON.parse(routineData.value));
+        }
+      } catch (e) {
+        console.error('ルーティンタスク読み込みエラー:', e);
+      }
+
       setLoading(false);
     }
     loadData();
@@ -143,6 +153,14 @@ function TaskManagerApp({ apiKey }) {
       });
     }
   }, [tags, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      window.storage.set('routineTasks', JSON.stringify(routineTasks)).catch(e => {
+        console.error('ルーティンタスク保存エラー:', e);
+      });
+    }
+  }, [routineTasks, loading]);
 
   useEffect(() => {
     if (hasActiveTask) {
@@ -694,6 +712,86 @@ function TaskManagerApp({ apiKey }) {
     });
   }, [tasks, fTag, fStatus, search, dFrom, dTo]);
 
+  // ルーティンタスク CRUD
+  const addRoutineTask = useCallback((task) => {
+    const newTask = {
+      id: Date.now() + Math.random(),
+      name: task.name,
+      memo: task.memo || '',
+      estimatedMinutes: task.estimatedMinutes || 0,
+      tag: task.tag || '',
+      days: task.days || [],
+      order: routineTasks.length
+    };
+    setRoutineTasks(prev => [...prev, newTask]);
+  }, [routineTasks]);
+
+  const updateRoutineTask = useCallback((id, updates) => {
+    setRoutineTasks(prev =>
+      prev.map(t => t.id === id ? { ...t, ...updates } : t)
+    );
+  }, []);
+
+  const deleteRoutineTask = useCallback((id) => {
+    if (window.confirm('このルーティンタスクを削除しますか？')) {
+      setRoutineTasks(prev => prev.filter(t => t.id !== id));
+    }
+  }, []);
+
+  const addRoutineTaskToToday = useCallback((routineTaskId) => {
+    const routineTask = routineTasks.find(t => t.id === routineTaskId);
+    if (!routineTask) return;
+
+    const newTask = {
+      id: Date.now() + Math.random(),
+      name: routineTask.name,
+      memo: routineTask.memo,
+      tag: routineTask.tag || '',
+      status: '未着手',
+      statusComment: '',
+      registeredDate: today,
+      workDates: [],
+      completedDate: null,
+      accumulatedTime: 0,
+      startedAt: null,
+      workSessions: [],
+      estimatedMinutes: routineTask.estimatedMinutes,
+      order: 0
+    };
+
+    setTasks(prev => [...prev, newTask]);
+    setTab('today');
+  }, [routineTasks, today]);
+
+  const addMultipleRoutineTasksToToday = useCallback((routineTaskIds) => {
+    if (routineTaskIds.length === 0) return;
+
+    const newTasks = routineTaskIds.map((id, index) => {
+      const routineTask = routineTasks.find(t => t.id === id);
+      if (!routineTask) return null;
+
+      return {
+        id: Date.now() + Math.random() + index,
+        name: routineTask.name,
+        memo: routineTask.memo,
+        tag: routineTask.tag || '',
+        status: '未着手',
+        statusComment: '',
+        registeredDate: today,
+        workDates: [],
+        completedDate: null,
+        accumulatedTime: 0,
+        startedAt: null,
+        workSessions: [],
+        estimatedMinutes: routineTask.estimatedMinutes,
+        order: index
+      };
+    }).filter(Boolean);
+
+    setTasks(prev => [...prev, ...newTasks]);
+    setTab('today');
+  }, [routineTasks, today]);
+
   if (loading) {
     return (
       <div style={{
@@ -861,6 +959,12 @@ function TaskManagerApp({ apiKey }) {
             addTag={addTag}
             deleteTagStart={deleteTagStart}
             aiStatus={aiStatus}
+            routineTasks={routineTasks}
+            onAddRoutineTask={addRoutineTask}
+            onUpdateRoutineTask={updateRoutineTask}
+            onDeleteRoutineTask={deleteRoutineTask}
+            onAddRoutineTaskToToday={addRoutineTaskToToday}
+            onAddMultipleRoutineTasksToToday={addMultipleRoutineTasksToToday}
           />
         )}
 

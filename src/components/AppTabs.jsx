@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TagColumn } from './TagColumn.jsx';
 import { DayCalendarCard } from './DayCalendarCard.jsx';
+import { RoutineTaskManager } from './RoutineTaskManager.jsx';
+import { RoutineTaskForm } from './RoutineTaskForm.jsx';
 import { getStatusColor, getStatusIcon } from '../constants/tagColors.js';
 import { formatDateShort, formatTime } from '../utils/formatters.js';
 import { styles } from '../styles/styles.js';
@@ -22,8 +24,16 @@ export function RegisterTab({
   setNewTag,
   addTag,
   deleteTagStart,
-  aiStatus
+  aiStatus,
+  routineTasks,
+  onAddRoutineTask,
+  onUpdateRoutineTask,
+  onDeleteRoutineTask,
+  onAddRoutineTaskToToday,
+  onAddMultipleRoutineTasksToToday
 }) {
+  const [showRoutineForm, setShowRoutineForm] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState(null);
   return (
     <div>
       <h2 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>タスクを入力</h2>
@@ -168,6 +178,41 @@ export function RegisterTab({
             )}
           </div>
         </div>
+      )}
+
+      <RoutineTaskManager
+        routineTasks={routineTasks}
+        onAddToToday={onAddRoutineTaskToToday}
+        onAddMultipleToToday={onAddMultipleRoutineTasksToToday}
+        onEdit={(id) => {
+          setEditingRoutine(routineTasks.find(t => t.id === id));
+          setShowRoutineForm(true);
+        }}
+        onDelete={onDeleteRoutineTask}
+        onAdd={() => {
+          setEditingRoutine(null);
+          setShowRoutineForm(true);
+        }}
+      />
+
+      {showRoutineForm && (
+        <RoutineTaskForm
+          initialTask={editingRoutine}
+          tags={tags}
+          onSave={(task) => {
+            if (editingRoutine) {
+              onUpdateRoutineTask(editingRoutine.id, task);
+            } else {
+              onAddRoutineTask(task);
+            }
+            setShowRoutineForm(false);
+            setEditingRoutine(null);
+          }}
+          onCancel={() => {
+            setShowRoutineForm(false);
+            setEditingRoutine(null);
+          }}
+        />
       )}
 
       <div style={{

@@ -202,5 +202,83 @@ export const styles = {
     fontSize: '0.85rem',
     width: '100%',
     marginTop: '8px'
+  },
+  routineSection: {
+    marginTop: '40px',
+    padding: '16px',
+    background: 'rgba(255,255,255,0.5)',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb'
+  },
+  routineHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px'
+  },
+  routineCard: {
+    padding: '12px',
+    borderRadius: '8px',
+    marginBottom: '12px'
+  },
+  routineTaskHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px'
+  },
+  routineInfo: {
+    fontSize: '0.85rem',
+    color: '#6b6b6b',
+    marginTop: '8px'
+  },
+  dayChip: {
+    display: 'inline-block',
+    padding: '2px 8px',
+    margin: '2px',
+    background: 'rgba(37, 99, 235, 0.1)',
+    borderRadius: '4px',
+    fontSize: '0.75rem',
+    color: '#2563eb',
+    border: '1px solid rgba(37, 99, 235, 0.2)'
+  },
+  routineActions: {
+    display: 'flex',
+    gap: '8px',
+    marginTop: '8px'
+  },
+  formOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
+  },
+  formModal: {
+    background: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    maxWidth: '500px',
+    width: '90%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+  },
+  formActions: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '24px',
+    justifyContent: 'flex-end'
+  },
+  daySelector: {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginBottom: '12px'
   }
 };
