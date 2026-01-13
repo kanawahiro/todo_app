@@ -26,6 +26,7 @@ function TaskManagerApp({ apiKey }) {
   const [tab, setTab] = useState('register');
   const [tasks, setTasks] = useState([]);
   const [routineTasks, setRoutineTasks] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [tags, setTags] = useState(['売上アップ', '雑務', '仕入れ', '広告', '受注発送関連']);
@@ -33,6 +34,7 @@ function TaskManagerApp({ apiKey }) {
   const [newTag, setNewTag] = useState('');
   const [input, setInput] = useState('');
   const [extracted, setExtracted] = useState([]);
+  const [extractedSchedule, setExtractedSchedule] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState(null);
   const [aiStatus, setAiStatus] = useState(null); // 'ok' | 'ng' | null
@@ -111,6 +113,15 @@ function TaskManagerApp({ apiKey }) {
         console.error('ルーティンタスク読み込みエラー:', e);
       }
 
+      try {
+        const schedulesData = await window.storage.get('schedules');
+        if (schedulesData && schedulesData.value) {
+          setSchedules(JSON.parse(schedulesData.value));
+        }
+      } catch (e) {
+        console.error('スケジュール読み込みエラー:', e);
+      }
+
       setLoading(false);
     }
     loadData();
@@ -161,6 +172,14 @@ function TaskManagerApp({ apiKey }) {
       });
     }
   }, [routineTasks, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      window.storage.set('schedules', JSON.stringify(schedules)).catch(e => {
+        console.error('スケジュール保存エラー:', e);
+      });
+    }
+  }, [schedules, loading]);
 
   useEffect(() => {
     if (hasActiveTask) {
@@ -242,16 +261,23 @@ function TaskManagerApp({ apiKey }) {
       const data = await response.json();
       console.log('Vercel API応答:', data);
 
-      if (data.success && data.tasks) {
-        console.log('✓ タスク抽出成功:', data.tasks.length, '件のタスクを抽出');
+      if (data.success) {
+        console.log('✓ タスク抽出成功:', data.tasks.length, '件のタスク、', data.schedule.length, '件のスケジュールを抽出');
         data.tasks.forEach((t, i) => {
-          console.log(`  ${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'}`);
+          console.log(`  タスク${i + 1}. [${t.name}] memo: ${t.memo ? t.memo.substring(0, 30) + '...' : '(なし)'} 見積もり時間: ${t.estimatedMinutes}分`);
+        });
+        data.schedule.forEach((s, i) => {
+          console.log(`  スケジュール${i + 1}. [${s.start}] ${s.event} - ${s.memo || '(メモなし)'}`);
         });
         setAiStatus('ok');
         setExtracted(data.tasks.map((t, i) => ({
           ...t,
           tid: Date.now() + i,
-          estimatedMinutes: 0
+          estimatedMinutes: t.estimatedMinutes || 0
+        })));
+        setExtractedSchedule(data.schedule.map((s, i) => ({
+          ...s,
+          sid: Date.now() + i + 1000
         })));
       } else {
         throw new Error('Invalid response from API');
@@ -344,12 +370,22 @@ function TaskManagerApp({ apiKey }) {
         };
       });
 
+    const newSchedules = extractedSchedule.map((s, index) => ({
+      id: Date.now() + Math.random() + index + 10000,
+      start: s.start,
+      event: s.event,
+      memo: s.memo,
+      date: today
+    }));
+
     setTasks(prev => [...prev, ...newTasks]);
+    setSchedules(prev => [...prev, ...newSchedules]);
     setExtracted([]);
+    setExtractedSchedule([]);
     setInput('');
     setToDelete(new Set());
     setTab('today');
-  }, [extracted, toDelete, tasks, today]);
+  }, [extracted, extractedSchedule, toDelete, tasks, today]);
 
   const startTask = useCallback((id) => {
     const now = Date.now();
@@ -949,9 +985,11 @@ function TaskManagerApp({ apiKey }) {
             extractTasks={extractTasks}
             extractError={extractError}
             extracted={extracted}
+            extractedSchedule={extractedSchedule}
             toDelete={toDelete}
             setToDelete={setToDelete}
             setExtracted={setExtracted}
+            setExtractedSchedule={setExtractedSchedule}
             registerTasks={registerTasks}
             tags={tags}
             newTag={newTag}
@@ -973,6 +1011,7 @@ function TaskManagerApp({ apiKey }) {
             tagOrder={tagOrder}
             tasksByTag={tasksByTag}
             elapsedTimes={elapsedTimes}
+            schedules={schedules.filter(s => s.date === today)}
             moveTag={moveTag}
             addManualTask={addManualTask}
             updateTask={updateTask}

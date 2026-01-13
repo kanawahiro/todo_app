@@ -36,51 +36,63 @@ export default async function handler(req, res) {
       model: GEMINI_MODEL
     });
 
-    const prompt = `あなたはタスク管理アシスタントです。入力テキストからタスクを抽出してJSON配列で出力してください。
+    const prompt = `あなたはタスク管理アシスタントです。入力テキストから「スケジュール」と「タスク」を抽出してJSONオブジェクトで出力してください。
 
-【最重要ルール】
-- "name"フィールドは必ず15文字以内の簡潔な動詞句にする
-- 詳細情報は全て"memo"フィールドに入れる
-- 「まず」「次に」「それから」「今日」などの接続詞・時間表現は削除する
-- タスクの所要時間が推測できる場合は"estimatedMinutes"に数値（分単位）を設定
+【スケジュールとタスクの区別】
+- **スケジュール**: 時刻指定のあるイベント（会議、打ち合わせ、ミーティング、予定など）
+  - 「13時にランチ」「10:00から会議」のように時刻が明記されているもの
+  - 時刻がなくても「会議」「打ち合わせ」「ミーティング」などのキーワードがあれば時刻を推測
+- **タスク**: 時刻指定のない作業項目（報告書作成、メール返信など）
 
-【タスク名（name）の書き方】
-- 「〜を確認」「〜に返信」「〜を作成」のような動詞で終わる短い表現
-- 数値、期限、条件、詳細は含めない
-- 例: "メール返信", "在庫確認", "動画作成", "資料送付"
+【スケジュール（schedule）の書き方】
+- "start": 開始時刻を "HH:MM" 形式で記載（例: "13:00", "10:30"）
+  - 時刻が明記されていない場合は、文脈から推測するか "00:00" を設定
+- "event": イベント名を15文字以内の簡潔な名詞句で記載（例: "チームミーティング", "ランチ"）
+- "memo": イベントの詳細情報（場所、参加者、議題など）
 
-【メモ（memo）の書き方】
-- タスク名に含まれない全ての詳細情報を記載
-- 数量、期限、条件、注意事項、補足説明など
-- 該当なしの場合のみ空文字列 ""
-
-【見積もり時間（estimatedMinutes）の設定】
-- タスクの内容から推測される所要時間を分単位の数値で設定
-- 明示的な時間が書かれている場合はその値を使用
-- 推測できない場合や不明な場合は 0 を設定
-- 例:
-  - "メール返信" → 5〜10分
-  - "会議" → 30〜60分
-  - "資料作成" → 60〜120分
-  - "簡単な確認" → 5分
+【タスク（tasks）の書き方】
+- "name": 15文字以内の簡潔な動詞句（例: "報告書作成", "メール返信"）
+- "tag": タグを選択（選択肢から最も適切なものを選ぶ）
+- "memo": 詳細情報
+- "estimatedMinutes": 推測される所要時間（分単位の数値）
 
 【入出力例】
-入力: "次に派遣のメールに返信を行う。確か商品の素材を記入する必要がある。"
-出力: {"name": "派遣メールに返信", "tag": "雑務", "memo": "商品の素材を記入する必要あり", "estimatedMinutes": 10}
+入力: "13時にランチミーティング。場所はカフェA。そのあと報告書作成"
+出力:
+{
+  "schedule": [
+    {"start": "13:00", "event": "ランチミーティング", "memo": "場所はカフェA"}
+  ],
+  "tasks": [
+    {"name": "報告書作成", "tag": "雑務", "memo": "", "estimatedMinutes": 60}
+  ]
+}
 
-入力: "会津にリスト26箱を出します。在庫切れで早めに欲しい商品があれば確認"
-出力: {"name": "会津にリスト出し", "tag": "受注発送関連", "memo": "26箱、在庫切れで早めに欲しい商品を確認", "estimatedMinutes": 30}
+入力: "10:00からチームミーティング。Zoomリンクは後ほど共有。その後在庫確認を30分でやる"
+出力:
+{
+  "schedule": [
+    {"start": "10:00", "event": "チームミーティング", "memo": "Zoomリンクは後ほど共有"}
+  ],
+  "tasks": [
+    {"name": "在庫確認", "tag": "仕入れ", "memo": "", "estimatedMinutes": 30}
+  ]
+}
 
-入力: "在庫の計算の方法を動画にしてまとめる。これは標準になって綾さんに伝える。"
-出力: {"name": "在庫計算動画作成", "tag": "雑務", "memo": "標準化して綾さんに伝える", "estimatedMinutes": 60}
-
-入力: "30分で相場分析をする"
-出力: {"name": "相場分析", "tag": "売上アップ", "memo": "", "estimatedMinutes": 30}
+入力: "メールに返信して、広告データを確認する"
+出力:
+{
+  "schedule": [],
+  "tasks": [
+    {"name": "メール返信", "tag": "雑務", "memo": "", "estimatedMinutes": 10},
+    {"name": "広告データ確認", "tag": "広告", "memo": "", "estimatedMinutes": 15}
+  ]
+}
 
 【タグの選択肢】: ${tags ? tags.join(', ') : '売上アップ, 雑務, 仕入れ, 広告, 受注発送関連'}
 
-【出力形式】JSON配列のみ。説明文や挨拶は不要。
-[{"name": "短いタスク名", "tag": "タグ", "memo": "詳細情報", "estimatedMinutes": 数値}]
+【出力形式】JSON オブジェクトのみ。説明文や挨拶は不要。
+{"schedule": [...], "tasks": [...]}
 
 入力テキスト:
 ${input}`;
@@ -91,17 +103,35 @@ ${input}`;
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              tag: { type: "string" },
-              memo: { type: "string" },
-              estimatedMinutes: { type: "integer" }
+          type: "object",
+          properties: {
+            schedule: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  start: { type: "string" },
+                  event: { type: "string" },
+                  memo: { type: "string" }
+                },
+                required: ["start", "event", "memo"]
+              }
             },
-            required: ["name", "tag", "memo", "estimatedMinutes"]
-          }
+            tasks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  tag: { type: "string" },
+                  memo: { type: "string" },
+                  estimatedMinutes: { type: "integer" }
+                },
+                required: ["name", "tag", "memo", "estimatedMinutes"]
+              }
+            }
+          },
+          required: ["schedule", "tasks"]
         }
       }
     });
@@ -118,7 +148,8 @@ ${input}`;
 
     return res.status(200).json({
       success: true,
-      tasks: parsed,
+      schedule: parsed.schedule || [],
+      tasks: parsed.tasks || [],
       usage: {
         input_tokens: usageMetadata.promptTokenCount || 0,
         output_tokens: usageMetadata.candidatesTokenCount || 0

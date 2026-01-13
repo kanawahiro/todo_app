@@ -15,9 +15,11 @@ export function RegisterTab({
   extractTasks,
   extractError,
   extracted,
+  extractedSchedule,
   toDelete,
   setToDelete,
   setExtracted,
+  setExtractedSchedule,
   registerTasks,
   tags,
   newTag,
@@ -57,6 +59,59 @@ export function RegisterTab({
 
       {extractError && (
         <div style={{ ...styles.error, marginTop: '12px' }}>{extractError}</div>
+      )}
+
+      {extractedSchedule && extractedSchedule.length > 0 && (
+        <div style={{ marginTop: '24px' }}>
+          <h3 style={{ margin: '0 0 12px 0' }}>抽出スケジュール:</h3>
+          {extractedSchedule.map(schedule => (
+            <div
+              key={schedule.sid}
+              style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '8px',
+                border: '1px solid rgba(59, 130, 246, 0.2)'
+              }}
+            >
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.85rem', color: '#888', minWidth: '50px' }}>時刻:</label>
+                <input
+                  type="text"
+                  value={schedule.start}
+                  onChange={(e) => setExtractedSchedule(prev =>
+                    prev.map(s => s.sid === schedule.sid ? { ...s, start: e.target.value } : s)
+                  )}
+                  placeholder="HH:MM"
+                  style={{ ...styles.input, width: '80px' }}
+                />
+                <label style={{ fontSize: '0.85rem', color: '#888', marginLeft: '8px' }}>イベント:</label>
+                <input
+                  type="text"
+                  value={schedule.event}
+                  onChange={(e) => setExtractedSchedule(prev =>
+                    prev.map(s => s.sid === schedule.sid ? { ...s, event: e.target.value } : s)
+                  )}
+                  placeholder="イベント名"
+                  style={{ ...styles.input, flex: 1 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.85rem', color: '#888', minWidth: '50px' }}>メモ:</label>
+                <input
+                  type="text"
+                  value={schedule.memo}
+                  onChange={(e) => setExtractedSchedule(prev =>
+                    prev.map(s => s.sid === schedule.sid ? { ...s, memo: e.target.value } : s)
+                  )}
+                  placeholder="詳細情報"
+                  style={{ ...styles.input, flex: 1 }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {extracted.length > 0 && (
@@ -261,6 +316,7 @@ export function TodayTab({
   tagOrder,
   tasksByTag,
   elapsedTimes,
+  schedules = [],
   moveTag,
   addManualTask,
   updateTask,
@@ -277,6 +333,78 @@ export function TodayTab({
   return (
     <div>
       <h2 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>今日のタスク</h2>
+
+      {schedules.length > 0 && (
+        <div style={{
+          background: 'rgba(255, 253, 240, 0.8)',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          borderRadius: '12px',
+          padding: '16px',
+          marginBottom: '20px'
+        }}>
+          <h3 style={{
+            fontSize: '1rem',
+            marginBottom: '12px',
+            color: '#3b82f6',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            📅 今日のスケジュール
+          </h3>
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}>
+            {schedules
+              .sort((a, b) => a.start.localeCompare(b.start))
+              .map(schedule => (
+                <div
+                  key={schedule.id}
+                  style={{
+                    background: 'white',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    minWidth: '200px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '4px'
+                  }}>
+                    <span style={{
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      color: '#3b82f6'
+                    }}>
+                      ⏰ {schedule.start}
+                    </span>
+                    <span style={{
+                      fontSize: '0.9rem',
+                      fontWeight: '500'
+                    }}>
+                      {schedule.event}
+                    </span>
+                  </div>
+                  {schedule.memo && (
+                    <div style={{
+                      fontSize: '0.85rem',
+                      color: '#666',
+                      marginTop: '4px'
+                    }}>
+                      {schedule.memo}
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap' }}>
         {tagOrder.map((tg, ti) => (
           <TagColumn
