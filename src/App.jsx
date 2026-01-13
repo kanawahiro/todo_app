@@ -23,7 +23,7 @@ const getTodayDate = () => {
 };
 
 function TaskManagerApp({ apiKey }) {
-  const [tab, setTab] = useState('register');
+  const [tab, setTab] = useState('today');
   const [tasks, setTasks] = useState([]);
   const [routineTasks, setRoutineTasks] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -957,8 +957,8 @@ function TaskManagerApp({ apiKey }) {
 
       <nav style={styles.tabNav}>
         {[
+          { id: 'today', label: '⏱️ 今日のタスク' },
           { id: 'register', label: '📝 登録' },
-          { id: 'today', label: '⏱️ 今日' },
           { id: 'calendar', label: '📅 カレンダー' },
           { id: 'database', label: '📊 DB' },
           { id: 'review', label: '📈 振り返り' }
@@ -977,6 +977,27 @@ function TaskManagerApp({ apiKey }) {
       </nav>
 
       <main style={styles.main}>
+        {tab === 'today' && (
+          <TodayTab
+            tagOrder={tagOrder}
+            tasksByTag={tasksByTag}
+            elapsedTimes={elapsedTimes}
+            schedules={schedules.filter(s => s.date === today)}
+            moveTag={moveTag}
+            addManualTask={addManualTask}
+            updateTask={updateTask}
+            moveTaskInTag={moveTaskInTag}
+            startTask={startTask}
+            pauseTask={pauseTask}
+            completeTask={completeTask}
+            waitTask={waitTask}
+            handleDeleteClick={handleDeleteClick}
+            updateSessions={updateSessions}
+            newTaskId={newTaskId}
+            taskInputRefs={taskInputRefs}
+          />
+        )}
+
         {tab === 'register' && (
           <RegisterTab
             input={input}
@@ -1003,27 +1024,6 @@ function TaskManagerApp({ apiKey }) {
             onDeleteRoutineTask={deleteRoutineTask}
             onAddRoutineTaskToToday={addRoutineTaskToToday}
             onAddMultipleRoutineTasksToToday={addMultipleRoutineTasksToToday}
-          />
-        )}
-
-        {tab === 'today' && (
-          <TodayTab
-            tagOrder={tagOrder}
-            tasksByTag={tasksByTag}
-            elapsedTimes={elapsedTimes}
-            schedules={schedules.filter(s => s.date === today)}
-            moveTag={moveTag}
-            addManualTask={addManualTask}
-            updateTask={updateTask}
-            moveTaskInTag={moveTaskInTag}
-            startTask={startTask}
-            pauseTask={pauseTask}
-            completeTask={completeTask}
-            waitTask={waitTask}
-            handleDeleteClick={handleDeleteClick}
-            updateSessions={updateSessions}
-            newTaskId={newTaskId}
-            taskInputRefs={taskInputRefs}
           />
         )}
 
