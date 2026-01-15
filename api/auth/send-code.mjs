@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
     // メール送信
     await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: 'noreply@store-lime.com',
       to: normalizedEmail,
       subject: 'タスク管理アプリ - ログインコード',
       html: `
