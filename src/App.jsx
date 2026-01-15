@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { RegisterTab, TodayTab, CalendarTab, DatabaseTab, ReviewTab } from './components/AppTabs.jsx';
 import { calculateElapsedTime, getDateString } from './utils/formatters.js';
 import { styles } from './styles/styles.js';
+import { useAuth } from './hooks/useAuth.js';
+import { LoginModal } from './components/LoginModal.jsx';
 
 // 定数定義
 const SAVE_DEBOUNCE_MS = 500;
@@ -23,6 +25,7 @@ const getTodayDate = () => {
 };
 
 function TaskManagerApp({ apiKey }) {
+  const { sessionToken, isLoading: authLoading, isAuthenticated } = useAuth();
   const [tab, setTab] = useState('today');
   const [tasks, setTasks] = useState([]);
   const [routineTasks, setRoutineTasks] = useState([]);
@@ -66,80 +69,151 @@ function TaskManagerApp({ apiKey }) {
     return tasks.some(t => t.status === '作業中');
   }, [tasks]);
 
+  // ローカルデータをクラウドに移行する関数
+  const migrateLocalData = useCallback(async (token) => {
+    try {
+      const localTasks = localStorage.getItem('tasks');
+      if (!localTasks) return false;
+
+      const localTags = localStorage.getItem('tags');
+      const localTagOrder = localStorage.getItem('tagOrder');
+      const localRoutineTasks = localStorage.getItem('routineTasks');
+      const localSchedules = localStorage.getItem('schedules');
+
+      const response = await fetch('/api/tasks/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionToken: token,
+          tasks: JSON.parse(localTasks || '[]'),
+          tags: JSON.parse(localTags || '["売上アップ", "雑務", "仕入れ", "広告", "受注発送関連"]'),
+          tagOrder: JSON.parse(localTagOrder || '["売上アップ", "雑務", "仕入れ", "広告", "受注発送関連"]'),
+          routineTasks: JSON.parse(localRoutineTasks || '[]'),
+          schedules: JSON.parse(localSchedules || '[]')
+        })
+      });
+
+      if (response.ok) {
+        // 移行成功 → 古いデータを削除
+        localStorage.removeItem('tasks');
+        localStorage.removeItem('tags');
+        localStorage.removeItem('tagOrder');
+        localStorage.removeItem('routineTasks');
+        localStorage.removeItem('schedules');
+        console.log('ローカルデータをクラウドに移行しました');
+        return true;
+      }
+    } catch (e) {
+      console.error('データ移行エラー:', e);
+    }
+    return false;
+  }, []);
+
+  // クラウドからデータを読み込む
   useEffect(() => {
     async function loadData() {
+      // 認証待ち
+      if (authLoading) return;
+
+      // 未認証の場合はスキップ
+      if (!isAuthenticated || !sessionToken) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const tasksData = await window.storage.get('tasks');
-        if (tasksData && tasksData.value) {
-          const loadedTasks = JSON.parse(tasksData.value);
-          const migratedTasks = loadedTasks.map(t => ({
+        // まずローカルデータの移行を試みる
+        const hasLocalData = localStorage.getItem('tasks');
+        if (hasLocalData) {
+          await migrateLocalData(sessionToken);
+        }
+
+        // クラウドからデータを読み込み
+        const response = await fetch('/api/tasks/load', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionToken })
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            // セッション無効 → ログアウト状態に
+            localStorage.removeItem('sessionToken');
+            window.location.reload();
+            return;
+          }
+          throw new Error('データの読み込みに失敗しました');
+        }
+
+        const result = await response.json();
+        if (result.success && result.data) {
+          const data = result.data;
+
+          // タスクのマイグレーション
+          const migratedTasks = (data.tasks || []).map(t => ({
             ...t,
             accumulatedTime: t.accumulatedTime ?? t.elapsedTime ?? 0,
             startedAt: t.startedAt ?? null,
             workSessions: t.workSessions ?? [],
             estimatedMinutes: t.estimatedMinutes ?? 0
           }));
+
           setTasks(migratedTasks);
+          setTags(data.tags || ['売上アップ', '雑務', '仕入れ', '広告', '受注発送関連']);
+          setTagOrder(data.tagOrder || ['売上アップ', '雑務', '仕入れ', '広告', '受注発送関連']);
+          setRoutineTasks(data.routineTasks || []);
+          setSchedules(data.schedules || []);
         }
       } catch (e) {
-        console.error('タスク読み込みエラー:', e);
-        setLoadError('タスクの読み込みに失敗しました');
-      }
-
-      try {
-        const tagOrderData = await window.storage.get('tagOrder');
-        if (tagOrderData && tagOrderData.value) {
-          setTagOrder(JSON.parse(tagOrderData.value));
-        }
-      } catch (e) {
-        console.error('タグ順序読み込みエラー:', e);
-      }
-
-      try {
-        const tagsData = await window.storage.get('tags');
-        if (tagsData && tagsData.value) {
-          setTags(JSON.parse(tagsData.value));
-        }
-      } catch (e) {
-        console.error('タグ読み込みエラー:', e);
-      }
-
-      try {
-        const routineData = await window.storage.get('routineTasks');
-        if (routineData && routineData.value) {
-          setRoutineTasks(JSON.parse(routineData.value));
-        }
-      } catch (e) {
-        console.error('ルーティンタスク読み込みエラー:', e);
-      }
-
-      try {
-        const schedulesData = await window.storage.get('schedules');
-        if (schedulesData && schedulesData.value) {
-          setSchedules(JSON.parse(schedulesData.value));
-        }
-      } catch (e) {
-        console.error('スケジュール読み込みエラー:', e);
+        console.error('データ読み込みエラー:', e);
+        setLoadError('データの読み込みに失敗しました');
       }
 
       setLoading(false);
     }
+
     loadData();
-  }, []);
+  }, [authLoading, isAuthenticated, sessionToken, migrateLocalData]);
 
   const saveTimeoutRef = useRef(null);
 
+  // クラウドへの自動保存（デバウンス）
   useEffect(() => {
-    if (loading) return;
+    if (loading || !isAuthenticated || !sessionToken) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    saveTimeoutRef.current = setTimeout(() => {
-      window.storage.set('tasks', JSON.stringify(tasks)).catch(e => {
-        console.error('タスク保存エラー:', e);
-      });
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/tasks/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionToken,
+            tasks,
+            tags,
+            tagOrder,
+            routineTasks,
+            schedules
+          })
+        });
+
+        if (!response.ok) {
+          console.error('クラウド保存エラー:', await response.text());
+          // フォールバック: ローカルにバックアップ
+          localStorage.setItem('tasks_backup', JSON.stringify({
+            tasks, tags, tagOrder, routineTasks, schedules
+          }));
+        }
+      } catch (e) {
+        console.error('保存エラー:', e);
+        // フォールバック: ローカルにバックアップ
+        localStorage.setItem('tasks_backup', JSON.stringify({
+          tasks, tags, tagOrder, routineTasks, schedules
+        }));
+      }
     }, SAVE_DEBOUNCE_MS);
 
     return () => {
@@ -147,39 +221,7 @@ function TaskManagerApp({ apiKey }) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [tasks, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      window.storage.set('tagOrder', JSON.stringify(tagOrder)).catch(e => {
-        console.error('タグ順序保存エラー:', e);
-      });
-    }
-  }, [tagOrder, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      window.storage.set('tags', JSON.stringify(tags)).catch(e => {
-        console.error('タグ保存エラー:', e);
-      });
-    }
-  }, [tags, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      window.storage.set('routineTasks', JSON.stringify(routineTasks)).catch(e => {
-        console.error('ルーティンタスク保存エラー:', e);
-      });
-    }
-  }, [routineTasks, loading]);
-
-  useEffect(() => {
-    if (!loading) {
-      window.storage.set('schedules', JSON.stringify(schedules)).catch(e => {
-        console.error('スケジュール保存エラー:', e);
-      });
-    }
-  }, [schedules, loading]);
+  }, [tasks, tags, tagOrder, routineTasks, schedules, loading, isAuthenticated, sessionToken]);
 
   useEffect(() => {
     if (hasActiveTask) {
@@ -828,7 +870,8 @@ function TaskManagerApp({ apiKey }) {
     setTab('today');
   }, [routineTasks, today]);
 
-  if (loading) {
+  // 認証チェック中
+  if (authLoading) {
     return (
       <div style={{
         ...styles.container,
@@ -838,6 +881,26 @@ function TaskManagerApp({ apiKey }) {
         height: '100vh'
       }}>
         読み込み中...
+      </div>
+    );
+  }
+
+  // 未認証 → ログインモーダル表示
+  if (!isAuthenticated) {
+    return <LoginModal onSuccess={() => window.location.reload()} />;
+  }
+
+  // データ読み込み中
+  if (loading) {
+    return (
+      <div style={{
+        ...styles.container,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        データを読み込み中...
       </div>
     );
   }
