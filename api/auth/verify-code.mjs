@@ -51,7 +51,8 @@ export default async function handler(req, res) {
     // 認証コード検証
     const storedCode = await redis.get(`authcode:${normalizedEmail}`);
 
-    if (!storedCode || storedCode !== code) {
+    // 型を揃えて比較（Redisが数値として返す場合があるため）
+    if (!storedCode || String(storedCode) !== String(code)) {
       // 失敗回数インクリメント
       await redis.incr(`authcode_attempts:${normalizedEmail}`);
       await redis.expire(`authcode_attempts:${normalizedEmail}`, 900); // 15分
